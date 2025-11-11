@@ -18,6 +18,10 @@
 #define GRAVITY_DEFAULT 10000.0
 #define GRAVITY_MIN 5000.0
 #define GRAVITY_MAX 20000.0
+#define MASS_DEFAULT 100.0
+#define MASS_MIN 0.0
+#define MASS_MAX 300.0
+#define COLOR_DEFAULT WHITE
 
 typedef struct {
     Vector2 anchor;
@@ -40,7 +44,7 @@ typedef struct {
 
 static void update_layout(GUIState *state);
 
-GUIState init_gui() {
+GUIState gui_init() {
     GuiLoadStyleDark();
     GUIState state = { 0 };
 
@@ -50,17 +54,17 @@ GUIState init_gui() {
 
     state.size = SIZE_DEFAULT;
     state.gravity = GRAVITY_DEFAULT;
-    state.color = WHITE;
-    state.mass = 0.0f;
-    state.movable = false;
+    state.color = COLOR_DEFAULT;
+    state.mass = MASS_DEFAULT;
+    state.movable = true;
     state.paused = false;
 
     update_layout(&state);
     return state;
 }
 
-void draw_gui(GUIState *state) {
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !state->moving) {
+void gui_draw(GUIState *state) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !state->moving) {
         Rectangle title_collision_rect = { state->anchor.x, state->anchor.y, state->layout[0].width - (RAYGUI_WINDOW_CLOSEBUTTON_SIZE + CLOSE_TITLE_SIZE_DELTA_HALF), RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT };
         if(CheckCollisionPointRec(GetMousePosition(), title_collision_rect)) {
             state->moving = true;
@@ -72,7 +76,7 @@ void draw_gui(GUIState *state) {
         state->anchor.x += mouse_delta.x;
         state->anchor.y += mouse_delta.y;
 
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
             state->moving = false;
             if (state->anchor.x < 0) state->anchor.x = 0;
             else if (state->anchor.x > GetScreenWidth() - state->layout[0].width) state->anchor.x = GetScreenWidth() - state->layout[0].width;
@@ -100,9 +104,9 @@ void draw_gui(GUIState *state) {
 
         GuiGroupBox(state->layout[4], "New Body");
         GuiColorPicker(state->layout[5], NULL, &state->color);
-        GuiSlider(state->layout[6], "Mass", NULL, &state->mass, 0, 100);
+        GuiSlider(state->layout[6], "Mass", NULL, &state->mass, MASS_MIN, MASS_MAX);
         GuiCheckBox(state->layout[7], "Moveable?", &state->movable);
-        state->create = GuiButton(state->layout[8], "Create!"); 
+        GuiToggle(state->layout[8], "Create!", &state->create);
 
         GuiGroupBox(state->layout[9], "Controls");
         state->reset = GuiButton(state->layout[10], "Reset"); 
