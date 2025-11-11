@@ -1,0 +1,10 @@
+-std=c99
+-Wall
+-g
+-Ilib
+-fcolor-diagnostics
+-fansi-escape-codes
+-fsanitize=address
+-I/opt/homebrew/Cellar/raylib/5.5/include
+-L/opt/homebrew/Cellar/raylib/5.5/lib
+-lraylib
