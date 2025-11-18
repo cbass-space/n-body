@@ -5,10 +5,10 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raylib.h"
 #include "raymath.h"
-#include "lib/raygui.h"
-#include "lib/gui_style.h"
+#include "raylib/raygui.h"
+#include "raylib/gui_style.h"
 
-#include "lib/types.h"
+#include "types.h"
 
 #define RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT 24
 #define RAYGUI_WINDOW_CLOSEBUTTON_SIZE 18
@@ -17,6 +17,9 @@
 #define SIZE_DEFAULT 10.0
 #define SIZE_MIN 0.0
 #define SIZE_MAX 20.0
+
+// TODO: grid size slider?
+#define GRID_DEFAULT 100.0
 
 #define GRAVITY_DEFAULT 10000.0
 #define GRAVITY_MIN 5000.0
@@ -27,7 +30,7 @@
 #define MASS_MAX 600.0
 
 #define TRAIL_DEFAULT 64
-#define TRAIL_MAX 1024
+#define TRAIL_MAX 512
 #define TRAIL_MIN 0
 
 #define COLOR_DEFAULT WHITE
@@ -39,7 +42,7 @@ typedef enum {
 
 typedef struct {
     Vector2 anchor;
-    Rectangle layout[19];
+    Rectangle layout[20];
     bool minimized;
     bool moving;
 
@@ -52,6 +55,7 @@ typedef struct {
     f32 size;
     f32 trail;
     bool draw_relative;
+    bool draw_field_grid;
     bool draw_velocity;
     bool draw_forces;
     bool draw_net_force;
@@ -63,8 +67,12 @@ typedef struct {
     bool previous_create;
 } GUIState;
 
-static void update_layout(GUIState *state);
+GUIState gui_init();
+void gui_draw(GUIState *state);
 
+#ifdef GUI_IMPLEMENTATION
+
+void update_layout(GUIState *state);
 GUIState gui_init() {
     GuiLoadStyleDark();
     GUIState state = {
@@ -80,6 +88,7 @@ GUIState gui_init() {
         .size = SIZE_DEFAULT,
         .trail = TRAIL_DEFAULT,
         .draw_relative = false,
+        .draw_field_grid = false,
         .draw_velocity = false,
         .draw_forces = false,
         .draw_net_force = false,
@@ -143,19 +152,20 @@ void gui_draw(GUIState *state) {
         GuiSliderBar(state->layout[8], "Size Modifier", NULL, &state->size, SIZE_MIN, SIZE_MAX);
         GuiSliderBar(state->layout[9], "Trail Length", NULL, &state->trail, TRAIL_MIN, TRAIL_MAX);
         GuiCheckBox(state->layout[10], "Draw Relative Trail", &state->draw_relative);
-        GuiCheckBox(state->layout[11], "Draw Velocity", &state->draw_velocity);
-        GuiCheckBox(state->layout[12], "Draw Net Force", &state->draw_net_force);
-        GuiCheckBox(state->layout[13], "Draw Force Components", &state->draw_forces);
+        GuiCheckBox(state->layout[11], "Draw Field Grid", &state->draw_field_grid);
+        GuiCheckBox(state->layout[12], "Draw Velocity", &state->draw_velocity);
+        GuiCheckBox(state->layout[13], "Draw Net Force", &state->draw_net_force);
+        GuiCheckBox(state->layout[14], "Draw Forces", &state->draw_forces);
 
-        GuiGroupBox(state->layout[14], "New / Edit Body");
-        GuiColorPicker(state->layout[15], NULL, &state->color);
-        GuiSlider(state->layout[16], "Mass", NULL, &state->mass, MASS_MIN, MASS_MAX);
-        GuiCheckBox(state->layout[17], "Moveable?", &state->movable);
-        GuiToggle(state->layout[18], "Create!", &state->create);
+        GuiGroupBox(state->layout[15], "New / Edit Body");
+        GuiColorPicker(state->layout[16], NULL, &state->color);
+        GuiSlider(state->layout[17], "Mass", NULL, &state->mass, MASS_MIN, MASS_MAX);
+        GuiCheckBox(state->layout[18], "Moveable?", &state->movable);
+        GuiToggle(state->layout[19], "Create!", &state->create);
     }
 }
 
-static void update_layout(GUIState *state) {
+void update_layout(GUIState *state) {
     Vector2 controls = { state->anchor.x + 16, state->anchor.y + 40 };
     Vector2 simulation = { state->anchor.x + 16, state->anchor.y + 112 };
     Vector2 drawing = { state->anchor.x + 16, state->anchor.y + 208 };
@@ -179,12 +189,15 @@ static void update_layout(GUIState *state) {
     state->layout[10] = (Rectangle) { drawing.x + 16, drawing.y + 80, 24, 24 };
     state->layout[11] = (Rectangle) { drawing.x + 16, drawing.y + 120, 24, 24 };
     state->layout[12] = (Rectangle) { drawing.x + 144, drawing.y + 120, 24, 24 };
-    state->layout[13] = (Rectangle) { drawing.x + 16, drawing.y + 160, 24, 24 };
+    state->layout[13] = (Rectangle) { drawing.x + 144, drawing.y + 160, 24, 24 };
+    state->layout[14] = (Rectangle) { drawing.x + 16, drawing.y + 160, 24, 24 };
     
     // New / Edit Body
-    state->layout[14] = (Rectangle) { body.x, body.y, 288, 216 };
-    state->layout[15] = (Rectangle) { body.x + 16, body.y + 16, 232, 112 };
-    state->layout[16] = (Rectangle) { body.x + 64, body.y + 144, 208, 16 };
-    state->layout[17] = (Rectangle) { body.x + 24, body.y + 176, 24, 24 };
-    state->layout[18] = (Rectangle) { body.x + 144, body.y + 176, 128, 24 };
+    state->layout[15] = (Rectangle) { body.x, body.y, 288, 216 };
+    state->layout[16] = (Rectangle) { body.x + 16, body.y + 16, 232, 112 };
+    state->layout[17] = (Rectangle) { body.x + 64, body.y + 144, 208, 16 };
+    state->layout[18] = (Rectangle) { body.x + 24, body.y + 176, 24, 24 };
+    state->layout[19] = (Rectangle) { body.x + 144, body.y + 176, 128, 24 };
 }
+
+#endif

@@ -2,3 +2,4 @@ build
 scratch.md
 .vscode
 compile_flags.txt
+.clangd

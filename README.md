@@ -6,10 +6,12 @@ A basic n-body simulation explorer to help learn C, Raylib, and the RK4 iterativ
 
 | Control | Action |
 | ------- | ------ |
-| `space` | Toggle Pause |
 | Right-Mouse Drag | Pan Camera |
 | Mouse Scroll | Zoom Camera |
+| `r` | Reset Simulation|
+| `space` | Toggle Pause |
 | Left-Click Planet | Select Target |
+| `[` and `]` | Cycle Through Planets |
 | `c` | Toggle Planet Creation |
 | `m` | Toggle if Planet is Movable |
 | Left-Mouse Drag | Set New Planet Velocity |
@@ -17,15 +19,17 @@ A basic n-body simulation explorer to help learn C, Raylib, and the RK4 iterativ
 ## Wants
 (in somewhat increasing order of i-dont-know-what-im-doing)
 - Fixed timestep for stability
-- Classical gravitational field viewer
-- Arena + dynamic arrays
 - Trajectory viewer?
 - Web build
 - RK4 vs Verlet? Barnes-Hut?
+- Collisions?
+- Planet deletion
+- Classical gravitational field lines?
 - Scene saver / loader
     - Three body problem
     - Solar system
     - Lagrange point demonstration
+    - Galaxy simulation? (dark matter painter?)
 - Parallelism with multi-threading or compute shader??
 - Interactive character like KSP?!!
 
