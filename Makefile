@@ -1,9 +1,11 @@
 CC      = clang
 TARGET  = main
-SOURCES = main.c
+SOURCES = src/main.c
 BUILD   = build
 
 CFLAGS  = -std=c99 -Wall -g -fcolor-diagnostics -fansi-escape-codes -fsanitize=address
+CFLAGS += -I.
+CFLAGS += -DARENA_IMPLEMENTATION -DGUI_IMPLEMENTATION -DSIM_IMPLEMENTATION -DDRAW_IMPLEMENTATION -DCAMERA_IMPLEMENTATION -DRAYGUI_IMPLEMENTATION
 LDFLAGS = $(shell pkg-config --libs raylib)
 
 all: $(BUILD)/$(TARGET)

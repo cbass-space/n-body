@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "lib/types.h"
 #include "simulation.h"
 
 void planet_draw(SimulationState *simulation, usize index);
@@ -30,7 +30,7 @@ void planet_draw(SimulationState *simulation, usize index) {
     void (*draw)(Vector2, f32, Color) = planet->movable ? DrawCircleLinesV : DrawCircleV;
     draw(
         planet->position,
-        simulation->gui.size * pow(planet->mass, 1.0/3.0),
+        planet_radius(simulation, planet->mass),
         planet->color
     );
 
@@ -47,7 +47,7 @@ void planet_draw(SimulationState *simulation, usize index) {
 
     // way to reduce computation?
     if (simulation->gui.draw_net_force) {
-        Vector2 net_acceleration = compute_field(planet->position, simulation, index);
+        Vector2 net_acceleration = compute_net_acceleration(planet->position, simulation, index);
         Vector2 net_force = Vector2Scale(net_acceleration, planet->mass);
         DrawVector(planet->position, net_force, planet->color);
     }
@@ -93,7 +93,7 @@ void planet_new_draw(SimulationState *simulation) {
     Vector2 position = IsMouseButtonDown(MOUSE_BUTTON_LEFT)
         ? Vector2Add(simulation->create_position, target_position)
         : mouse;
-    draw(position, simulation->gui.size * pow(simulation->gui.mass, 1.0/3.0), color);
+    draw(position, planet_radius(simulation, simulation->gui.mass), color);
 
     if (!simulation->gui.movable) return;
     Vector2 dragged_velocity = IsMouseButtonDown(MOUSE_LEFT_BUTTON) ? Vector2Subtract(position, mouse) : Vector2Zero();
@@ -108,12 +108,12 @@ void field_grid_draw(SimulationState *simulation) {
     if (!simulation->gui.draw_field_grid) return;
 
     Vector2 start = GetScreenToWorld2D(Vector2Zero(), simulation->camera);
-    Vector2 end = GetScreenToWorld2D((Vector2) { GetScreenWidth(), GetScreenHeight() }, simulation->camera);
+    Vector2 end = GetScreenToWorld2D((Vector2) { (f32)GetScreenWidth(), (f32)GetScreenHeight() }, simulation->camera);
     
     for (f32 x = start.x - fmodf(start.x, GRID_DEFAULT); x < end.x + GRID_DEFAULT; x += GRID_DEFAULT) {
         for (f32 y = start.y - fmodf(start.y, GRID_DEFAULT); y < end.y + GRID_DEFAULT; y += GRID_DEFAULT) {
             Vector2 position = (Vector2) { x, y };
-            Vector2 acceleration = compute_field(position, simulation, -1);
+            Vector2 acceleration = compute_net_acceleration(position, simulation, -1);
             DrawVector(position, acceleration, DARKGRAY);
         }
     }

@@ -8,39 +8,33 @@
 #include "raylib.h"
 #include "raymath.h"
 
-#define ARENA_IMPLEMENTATION
-#define GUI_IMPLEMENTATION
-#define SIM_IMPLEMENTATION
-#define DRAW_IMPLEMENTATION
-#define CAMERA_IMPLEMENTATION
-
 #include "lib/types.h"
 #include "lib/arena.h"
-#include "lib/gui.h"
-#include "lib/simulation.h"
-#include "lib/draw.h"
-#include "lib/camera.h"
 
-#define MAX_LENGTH 2048
-#define DEFAULT_WIDTH 1200
-#define DEFAULT_HEIGHT 900
+#include "gui.h"
+#include "simulation.h"
+#include "draw.h"
+#include "camera.h"
+
+#define WIDTH_DEFAULT 1200
+#define HEIGHT_DEFAULT 900
+#define TIME_STEP 0.01
 
 void planet_create(SimulationState *simulation, Arena *arena);
 void planet_update_gui(SimulationState *simulation);
 
 i32 main() {
-    Arena arena = arena_new(1024 * 1024);
-
+    Arena arena = arena_new(8 * (2 << 20));
     SetConfigFlags(FLAG_MSAA_4X_HINT | FLAG_WINDOW_RESIZABLE);
-    InitWindow(DEFAULT_WIDTH, DEFAULT_HEIGHT, "esby is confused");
+    InitWindow(WIDTH_DEFAULT, HEIGHT_DEFAULT, "esby is confused");
     SetTargetFPS(60);
 
     SimulationState simulation;
     simulation_init(&simulation, &arena);
 
+    f32 time_accumulator = 0.0; // https://gafferongames.com/post/fix_your_timestep/
     while (!WindowShouldClose() || IsKeyPressed(KEY_ESCAPE)) {
-        f32 dt = GetFrameTime();
-
+        // get input
         if (IsKeyPressed(KEY_R) || simulation.gui.reset) simulation_init(&simulation, &arena);
         if (IsKeyPressed(KEY_SPACE)) simulation.gui.paused = !simulation.gui.paused;
         if (IsKeyPressed(KEY_ESCAPE) && simulation.gui.create) simulation.gui.create = false;
@@ -49,19 +43,29 @@ i32 main() {
         if (IsKeyPressed(KEY_C)) simulation.gui.create = !simulation.gui.create;
         if (IsKeyPressed(KEY_M)) simulation.gui.movable = !simulation.gui.movable;
 
-        target_set(&simulation);
-        camera_update(&simulation, dt);
-        planet_update_gui(&simulation);
-
         planet_create(&simulation, &arena);
+        planet_update_gui(&simulation);
+        target_set(&simulation);
 
-        simulation.previous.length = simulation.planets.length;
-        memcpy(simulation.previous.data, simulation.planets.data, simulation.planets.length * sizeof(Planet));
+        // update and simulate
+        f32 dt = GetFrameTime();
+        time_accumulator += dt;
 
-        for (usize i = 0; i < simulation.planets.length; i++) {
-            if (!simulation.gui.paused) planet_update(&simulation, i, dt);
+        while (time_accumulator >= TIME_STEP) {
+            camera_update(&simulation, TIME_STEP);
+
+            simulation.previous.length = simulation.planets.length;
+            memcpy(simulation.previous.data, simulation.planets.data, simulation.planets.length * sizeof(Planet));
+            for (usize i = 0; i < simulation.planets.length; i++) {
+                planet_update(&simulation, i, TIME_STEP);
+            }
+
+            collide_planets(&simulation);
+
+            time_accumulator -= TIME_STEP;
         }
 
+        // draw
         BeginDrawing();
         ClearBackground(BLACK);
         BeginMode2D(simulation.camera);
@@ -82,6 +86,17 @@ i32 main() {
     arena_free(&arena);
     return 0;
 }
+
+Color colors[] = {
+    WHITE,
+    (Color) { 242, 96, 151, 255 },
+    (Color) { 231, 120, 59, 255 },
+    (Color) { 182, 153, 39, 255 },
+    (Color) { 94, 179, 81, 255 },
+    (Color) { 46, 177, 168, 255 },
+    (Color) { 55, 167, 222, 255 },
+    (Color) { 142, 141, 246, 255 },
+};
 
 void planet_create(SimulationState *simulation, Arena *arena) {
     if (!simulation->gui.create) return;
@@ -105,6 +120,7 @@ void planet_create(SimulationState *simulation, Arena *arena) {
         Vector2 absolute_position = Vector2Add(target_position, simulation->create_position);
         Vector2 dragged_velocity = Vector2Subtract(absolute_position, mouse); // like angry birds
 
+        // TODO: switch to stb_ds.h
         *list_push(&simulation->previous, arena) = (Planet) { 0 };
         *list_push(&simulation->planets, arena) = (Planet) {
             .position = absolute_position,
@@ -113,6 +129,10 @@ void planet_create(SimulationState *simulation, Arena *arena) {
             .movable = simulation->gui.movable,
             .color = simulation->gui.color,
         };
+
+        static usize color_index = 0;
+        color_index = (color_index + 1) % 8;
+        simulation->gui.color = colors[color_index];
     }
 }
 

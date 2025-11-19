@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "lib/types.h"
 #include "simulation.h"
 
 void camera_update(SimulationState *simulation, f32 dt);
@@ -21,8 +21,11 @@ void target_set(SimulationState *simulation) {
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return;
     for (usize i = 0; i < simulation->planets.length; i++) {
         Planet planet = simulation->planets.data[i];
-        f32 size = simulation->gui.size * pow(planet.mass, 1.0/3.0);
-        if (CheckCollisionPointCircle(GetScreenToWorld2D(GetMousePosition(), simulation->camera), planet.position, size)) {
+        if (CheckCollisionPointCircle(
+            GetScreenToWorld2D(GetMousePosition(), simulation->camera),
+            planet.position,
+            planet_radius(simulation, planet.mass))
+        ) {
             simulation->target = i;
             simulation->gui.mass = planet.mass;
             simulation->gui.movable = planet.movable;
