@@ -1,11 +1,12 @@
 #pragma once
 
 #include "lib/types.h"
-#include "simulation.h"
+#include "application.h"
+#include "src/simulation.h"
 
-void planet_draw(SimulationState *simulation, usize index);
-void planet_new_draw(SimulationState *simulation);
-void field_grid_draw(SimulationState *simulation);
+void planet_draw(const Application *application, usize index);
+void planet_creation_draw(const Application *application);
+void field_grid_draw(const Application *application);
 
 #ifdef DRAW_IMPLEMENTATION
 
@@ -24,96 +25,105 @@ void DrawVector(Vector2 start, Vector2 vector, Color color) {
     DrawLineV(end, Vector2Add(end, Vector2Scale(head_2, ARROW_HEAD_LENGTH)), color);
 }
 
-void planet_draw(SimulationState *simulation, usize index) {
-    Planet *planet = &simulation->planets.data[index];
+void planet_draw(const Application *application, usize index) {
+    Planet *planet = &application->simulation.planets[index];
 
     void (*draw)(Vector2, f32, Color) = planet->movable ? DrawCircleLinesV : DrawCircleV;
     draw(
         planet->position,
-        planet_radius(simulation, planet->mass),
+        planet_radius(&application->simulation, planet->mass),
         planet->color
     );
 
-    // slider to control force arrow size?
-    if (simulation->gui.draw_forces) {
-        for (usize i = 0; i < simulation->planets.length; i++) {
+    // TODO: slider to control force arrow size?
+    if (application->gui.draw_forces) {
+        for (usize i = 0; i < arrlen(application->simulation.planets); i++) {
             if (i == index) continue;
-            Vector2 accleration = compute_acceleration(planet->position, simulation, i);
+            Vector2 accleration = compute_acceleration(&application->simulation, planet->position, i, -1);
             Vector2 force = Vector2Scale(accleration, planet->mass);
-            DrawVector(planet->position, force, simulation->planets.data[i].color);
+            DrawVector(planet->position, force, planet->color);
         }
-
     }
 
-    // way to reduce computation?
-    if (simulation->gui.draw_net_force) {
-        Vector2 net_acceleration = compute_net_acceleration(planet->position, simulation, index);
+    // TODO: reduce computation by caching in update loop?
+    if (application->gui.draw_net_force) {
+        Vector2 net_acceleration = compute_net_acceleration(&application->simulation, planet->position, index, -1);
         Vector2 net_force = Vector2Scale(net_acceleration, planet->mass);
         DrawVector(planet->position, net_force, planet->color);
     }
 
-    if (!planet->movable && simulation->target == -1) return;
-    Vector2 target_velocity = (simulation->gui.draw_relative && simulation->target != -1)
-        ? simulation->planets.data[simulation->target].velocity
+    if (!planet->movable && application->planet_target == -1) return;
+    Vector2 target_velocity = (application->gui.draw_relative && application->planet_target != -1)
+        ? application->simulation.planets[application->planet_target].velocity
         : Vector2Zero();
-    if (simulation->gui.draw_velocity) DrawVector(planet->position, Vector2Subtract(planet->velocity, target_velocity), planet->color);
+    if (application->gui.draw_velocity) DrawVector(planet->position, Vector2Subtract(planet->velocity, target_velocity), planet->color);
 
-    usize count = planet->trail.count < simulation->gui.trail ? planet->trail.count : simulation->gui.trail;
-    for (usize i = 1; i < count; i++) {
-        Vector2 a = planet->trail.positions[(planet->trail.oldest + planet->trail.count - i) % TRAIL_MAX];
-        Vector2 b = planet->trail.positions[(planet->trail.oldest + planet->trail.count - i - 1) % TRAIL_MAX];
+    // TODO: find a way to use DrawLineStrip with variable color?
+    usize trail_count = planet->trail.count < application->gui.trail ? planet->trail.count : application->gui.trail;
+    for (usize i = 1; i < trail_count; i++) {
+        Vector2 a = planet->trail.positions[trail_nth_latest(&planet->trail, i)];
+        Vector2 b = planet->trail.positions[trail_nth_latest(&planet->trail, i + 1)];
 
-        if (simulation->gui.draw_relative && simulation->target != -1) {
-            Planet *target = &simulation->planets.data[simulation->target];
-            a = Vector2Add(target->position, Vector2Subtract(a, target->trail.positions[(target->trail.oldest + target->trail.count - i) % TRAIL_MAX]));
-            b = Vector2Add(target->position, Vector2Subtract(b, target->trail.positions[(target->trail.oldest + target->trail.count - i - 1) % TRAIL_MAX]));
+        if (application->gui.draw_relative && application->planet_target != -1) {
+            Planet *target = &application->simulation.planets[application->planet_target];
+            a = Vector2Add(target->position, Vector2Subtract(a, target->trail.positions[trail_nth_latest(&target->trail, i)]));
+            b = Vector2Add(target->position, Vector2Subtract(b, target->trail.positions[trail_nth_latest(&target->trail, i + 1)]));
         }
 
         Color color = planet->color;
-        color.a = 256 * (count - i) / count;
+        color.a = 256 * (trail_count - i) / trail_count;
+        DrawLineV(a, b, color);
+    }
+
+    usize predict_count = PREDICT_LENGTH;
+    for (usize i = 1; i < predict_count; i++) {
+        Vector2 a = planet->prediction.positions[i];
+        Vector2 b = planet->prediction.positions[i - 1];
+
+        if (application->gui.draw_relative && application->planet_target != -1) {
+            Planet *target = &application->simulation.planets[application->planet_target];
+            a = Vector2Add(target->position, Vector2Subtract(a, target->prediction.positions[i]));
+            b = Vector2Add(target->position, Vector2Subtract(b, target->prediction.positions[i - 1]));
+        }
+
+        Color color = planet->color;
+        color.a = 256 * (predict_count - i) / (3.0 * predict_count);
         DrawLineV(a, b, color);
     }
 }
 
-void planet_new_draw(SimulationState *simulation) {
-    if (!simulation->gui.create) return;
-    if (CheckCollisionPointRec(GetMousePosition(), simulation->gui.layout[0])) return;
-    Vector2 mouse = GetScreenToWorld2D(GetMousePosition(), simulation->camera);
+void planet_creation_draw(const Application *application) {
+    if (!application->gui.create) return;
+    if (CheckCollisionPointRec(GetMousePosition(), application->gui.layout[0])) return;
+    const Planet *creation = &application->simulation.creation;
 
-    void (*draw)(Vector2, f32, Color) = simulation->gui.movable ? DrawCircleLinesV : DrawCircleV;
-    Color color = simulation->gui.color;
+    Color color = creation->color;
     color.a = 128;
 
-    Vector2 target_position = (simulation->target != -1)
-        ? simulation->planets.data[simulation->target].position
-        : Vector2Zero();
-    Vector2 target_velocity = (simulation->target != -1 && !simulation->gui.draw_relative)
-        ? simulation->planets.data[simulation->target].velocity
-        : Vector2Zero();
-    Vector2 position = IsMouseButtonDown(MOUSE_BUTTON_LEFT)
-        ? Vector2Add(simulation->create_position, target_position)
-        : mouse;
-    draw(position, planet_radius(simulation, simulation->gui.mass), color);
+    void (*draw)(Vector2, f32, Color) = creation->movable ? DrawCircleLinesV : DrawCircleV;
+    draw(creation->position, planet_radius(&application->simulation, creation->mass), color);
 
-    if (!simulation->gui.movable) return;
-    Vector2 dragged_velocity = IsMouseButtonDown(MOUSE_LEFT_BUTTON) ? Vector2Subtract(position, mouse) : Vector2Zero();
+    if (!creation->movable && application->planet_target == -1) return;
+    Vector2 target_velocity = (application->planet_target != -1 && application->gui.draw_relative)
+        ? application->simulation.planets[application->planet_target].velocity
+        : Vector2Zero();
     DrawVector(
-        position,
-        Vector2Add(target_velocity, dragged_velocity),
-        simulation->gui.color
+        creation->position,
+        Vector2Subtract(creation->velocity, target_velocity),
+        application->gui.color
     );
 };
 
-void field_grid_draw(SimulationState *simulation) {
-    if (!simulation->gui.draw_field_grid) return;
+void field_grid_draw(const Application *application) {
+    if (!application->gui.draw_field_grid) return;
 
-    Vector2 start = GetScreenToWorld2D(Vector2Zero(), simulation->camera);
-    Vector2 end = GetScreenToWorld2D((Vector2) { (f32)GetScreenWidth(), (f32)GetScreenHeight() }, simulation->camera);
+    Vector2 start = GetScreenToWorld2D(Vector2Zero(), application->camera);
+    Vector2 end = GetScreenToWorld2D((Vector2) { (f32)GetScreenWidth(), (f32)GetScreenHeight() }, application->camera);
     
     for (f32 x = start.x - fmodf(start.x, GRID_DEFAULT); x < end.x + GRID_DEFAULT; x += GRID_DEFAULT) {
         for (f32 y = start.y - fmodf(start.y, GRID_DEFAULT); y < end.y + GRID_DEFAULT; y += GRID_DEFAULT) {
             Vector2 position = (Vector2) { x, y };
-            Vector2 acceleration = compute_net_acceleration(position, simulation, -1);
+            Vector2 acceleration = compute_net_acceleration(&application->simulation, position, -1, -1);
             DrawVector(position, acceleration, DARKGRAY);
         }
     }

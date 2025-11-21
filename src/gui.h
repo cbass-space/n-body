@@ -2,56 +2,22 @@
 
 #include <string.h>
 
+#define RAYGUI_IMPLEMENTATION
 #include "raylib.h"
 #include "lib/raygui.h"
 #include "lib/gui_style.h"
-
 #include "lib/types.h"
+
+#include "constants.h"
+#include "simulation.h"
 
 #define RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT 24
 #define RAYGUI_WINDOW_CLOSEBUTTON_SIZE 18
 #define CLOSE_TITLE_SIZE_DELTA_HALF (RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT - RAYGUI_WINDOW_CLOSEBUTTON_SIZE) / 2
 
-#define GRAVITY_DEFAULT 10000.0
-#define GRAVITY_MIN 5000.0
-#define GRAVITY_MAX 20000.0
-
-#define SOFTENING_DEFAULT 0.01
-#define SOFTENING_MIN 0.00
-#define SOFTENING_MAX 0.05
-
-#define INTEGRATOR_DEFAULT VERLET
-
-#define DENSITY_DEFAULT 0.001
-#define DENSITY_MAX 0.005
-#define DENSITY_MIN 0.000125
-
-#define TRAIL_DEFAULT 128
-#define TRAIL_MAX 512
-#define TRAIL_MIN 0
-
-// TODO: grid size slider?
-#define GRID_DEFAULT 100.0
-
-#define COLOR_DEFAULT WHITE
-
-#define MASS_DEFAULT 100.0
-#define MASS_MIN 0.0
-#define MASS_MAX 600.0
-
-typedef enum {
-    EULER,
-    VERLET,
-    RK4,
-} Integrator;
-
-typedef enum {
-    NONE,
-    MERGE,
-    ELASTIC
-} Collisions;
-
 typedef struct {
+    SimulationParameters *simulation;
+
     Vector2 anchor;
     Rectangle layout[23];
     bool minimized;
@@ -60,13 +26,7 @@ typedef struct {
     bool reset;
     bool paused;
 
-    f32 gravity;
-    f32 softening;
-    f32 density;
-    Integrator integrator;
-    bool barnes_hut;
-    Collisions collisions;
-
+    // something similar to simulation parameters?
     f32 trail;
     bool draw_relative;
     bool draw_field_grid;
@@ -79,29 +39,25 @@ typedef struct {
     bool movable;
     bool create;
     bool previous_create;
-} GUIState;
+} GUI;
 
-GUIState gui_init();
-void gui_draw(GUIState *state);
+GUI gui_init(SimulationParameters *simulation);
+void gui_draw(GUI *state);
 
 #ifdef GUI_IMPLEMENTATION
 
-void update_layout(GUIState *state);
-GUIState gui_init() {
+// TODO: store pointer to simulation to udpate later
+void update_layout(GUI *state);
+GUI gui_init(SimulationParameters *simulation) {
     GuiLoadStyleDark();
-    GUIState state = {
+    GUI state = {
+        .simulation = simulation,
+
         .anchor = (Vector2){ 24, 24 },
         .minimized = false,
         .moving = false,
 
         .paused = false,
-
-        .gravity = GRAVITY_DEFAULT,
-        .softening = SOFTENING_DEFAULT,
-        .density = DENSITY_DEFAULT,
-        .integrator = INTEGRATOR_DEFAULT,
-        .barnes_hut = false,
-        .collisions = NONE,
 
         .trail = TRAIL_DEFAULT,
         .draw_relative = false,
@@ -121,77 +77,77 @@ GUIState gui_init() {
     return state;
 }
 
-void gui_draw(GUIState *state) {
-    state->previous_create = state->create;
+void gui_draw(GUI *gui) {
+    gui->previous_create = gui->create;
 
-    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !state->moving) {
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !gui->moving) {
         Rectangle title_collision_rect = {
-            state->anchor.x,
-            state->anchor.y,
-            state->layout[0].width - (RAYGUI_WINDOW_CLOSEBUTTON_SIZE + CLOSE_TITLE_SIZE_DELTA_HALF),
+            gui->anchor.x,
+            gui->anchor.y,
+            gui->layout[0].width - (RAYGUI_WINDOW_CLOSEBUTTON_SIZE + (f32)CLOSE_TITLE_SIZE_DELTA_HALF),
             RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT
         };
-        if(CheckCollisionPointRec(GetMousePosition(), title_collision_rect)) state->moving = true;
+        if(CheckCollisionPointRec(GetMousePosition(), title_collision_rect)) gui->moving = true;
     }
 
-    if (state->moving) {
+    if (gui->moving) {
         Vector2 mouse_delta = GetMouseDelta();
-        state->anchor.x += mouse_delta.x;
-        state->anchor.y += mouse_delta.y;
+        gui->anchor.x += mouse_delta.x;
+        gui->anchor.y += mouse_delta.y;
 
         if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-            state->moving = false;
-            if (state->anchor.x < 0) state->anchor.x = 0;
-            else if (state->anchor.x > GetScreenWidth() - state->layout[0].width) state->anchor.x = GetScreenWidth() - state->layout[0].width;
-            if (state->anchor.y < 0) state->anchor.y = 0;
-            else if (state->anchor.y > GetScreenHeight()) state->anchor.y = GetScreenHeight() - RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT;
+            gui->moving = false;
+            if (gui->anchor.x < 0) gui->anchor.x = 0;
+            else if (gui->anchor.x > GetScreenWidth() - gui->layout[0].width) gui->anchor.x = GetScreenWidth() - gui->layout[0].width;
+            if (gui->anchor.y < 0) gui->anchor.y = 0;
+            else if (gui->anchor.y > GetScreenHeight()) gui->anchor.y = GetScreenHeight() - RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT;
         }
 
-        update_layout(state);
+        update_layout(gui);
     }
 
-    if (state->minimized) {
-        GuiStatusBar((Rectangle){ state->anchor.x, state->anchor.y, state->layout[0].width, RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT }, "N-Body Simulation");
-        if (GuiButton((Rectangle){ state->anchor.x + state->layout[0].width - RAYGUI_WINDOW_CLOSEBUTTON_SIZE - (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
-                                   state->anchor.y + (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
+    if (gui->minimized) {
+        GuiStatusBar((Rectangle){ gui->anchor.x, gui->anchor.y, gui->layout[0].width, RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT }, "N-Body Simulation");
+        if (GuiButton((Rectangle){ gui->anchor.x + gui->layout[0].width - RAYGUI_WINDOW_CLOSEBUTTON_SIZE - (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
+                                   gui->anchor.y + (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
                                    RAYGUI_WINDOW_CLOSEBUTTON_SIZE,
                                    RAYGUI_WINDOW_CLOSEBUTTON_SIZE },
                                    "#120#")) {
-            state->minimized = false;
+            gui->minimized = false;
         }
     } else {
-        state->minimized = GuiWindowBox(state->layout[0], "N-Body Simulation");
+        gui->minimized = GuiWindowBox(gui->layout[0], "N-Body Simulation");
 
-        GuiGroupBox(state->layout[1], "Controls");
-        state->reset = GuiButton(state->layout[2], "Reset"); 
-        GuiToggle(state->layout[3], "Pause", &state->paused);
+        GuiGroupBox(gui->layout[1], "Controls");
+        gui->reset = GuiButton(gui->layout[2], "Reset"); 
+        GuiToggle(gui->layout[3], "Pause", &gui->paused);
 
-        GuiGroupBox(state->layout[4], "Simulation Parameters");
-        GuiSlider(state->layout[5], "Gravity", NULL, &state->gravity, GRAVITY_MIN, GRAVITY_MAX);
-        GuiSlider(state->layout[6], "Softening", NULL, &state->softening, SOFTENING_MIN, SOFTENING_MAX);
-        GuiSlider(state->layout[7], "Density", NULL, &state->density, DENSITY_MIN, DENSITY_MAX);
-        GuiToggleGroup(state->layout[8], "Euler;Verlet;RK4", (int *)&state->integrator);
-        GuiToggleGroup(state->layout[9], "None;Merge;Elastic", (int *)&state->collisions);
-        GuiToggleGroup(state->layout[10], "Direct;Barnes-Hut", (bool *)&state->barnes_hut);
+        GuiGroupBox(gui->layout[4], "Simulation Parameters");
+        GuiSlider(gui->layout[5], "Gravity", NULL, &gui->simulation->gravity, GRAVITY_MIN, GRAVITY_MAX);
+        GuiSlider(gui->layout[6], "Density", NULL, &gui->simulation->density, DENSITY_MIN, DENSITY_MAX);
+        GuiSlider(gui->layout[7], "Softening", NULL, &gui->simulation->softening, SOFTENING_MIN, SOFTENING_MAX);
+        GuiToggleGroup(gui->layout[8], "Euler;Verlet;RK4", (int *)&gui->simulation->integrator);
+        GuiToggleGroup(gui->layout[9], "None;Merge;Elastic", (int *)&gui->simulation->collisions);
+        GuiToggleGroup(gui->layout[10], "Direct;Barnes-Hut", (bool *)&gui->simulation->barnes_hut);
 
-        GuiGroupBox(state->layout[11], "Drawing Controls");
-        GuiSliderBar(state->layout[12], "Trail Length", NULL, &state->trail, TRAIL_MIN, TRAIL_MAX);
-        GuiCheckBox(state->layout[13], "Relative Trail", &state->draw_relative);
-        GuiCheckBox(state->layout[14], "Draw Field Grid", &state->draw_field_grid);
-        GuiCheckBox(state->layout[15], "Draw Velocity", &state->draw_velocity);
-        GuiCheckBox(state->layout[16], "Draw Net Force", &state->draw_net_force);
-        GuiCheckBox(state->layout[17], "Draw Forces", &state->draw_forces);
+        GuiGroupBox(gui->layout[11], "Drawing Controls");
+        GuiSliderBar(gui->layout[12], "Trail Length", NULL, &gui->trail, TRAIL_MIN, TRAIL_MAX);
+        GuiCheckBox(gui->layout[13], "Relative Trail", &gui->draw_relative);
+        GuiCheckBox(gui->layout[14], "Draw Field Grid", &gui->draw_field_grid);
+        GuiCheckBox(gui->layout[15], "Draw Velocity", &gui->draw_velocity);
+        GuiCheckBox(gui->layout[16], "Draw Net Force", &gui->draw_net_force);
+        GuiCheckBox(gui->layout[17], "Draw Forces", &gui->draw_forces);
 
-        GuiGroupBox(state->layout[18], "New / Edit Body");
-        GuiColorPicker(state->layout[19], NULL, &state->color);
-        GuiSlider(state->layout[20], "Mass", NULL, &state->mass, MASS_MIN, MASS_MAX);
-        GuiCheckBox(state->layout[21], "Moveable?", &state->movable);
-        GuiToggle(state->layout[22], "Create!", &state->create);
+        GuiGroupBox(gui->layout[18], "New / Edit Body");
+        GuiColorPicker(gui->layout[19], NULL, &gui->color);
+        GuiSlider(gui->layout[20], "Mass", NULL, &gui->mass, MASS_MIN, MASS_MAX);
+        GuiCheckBox(gui->layout[21], "Moveable?", &gui->movable);
+        GuiToggle(gui->layout[22], "Create!", &gui->create);
     }
 }
 
 // TODO: this is so bad
-void update_layout(GUIState *state) {
+void update_layout(GUI *state) {
     Vector2 controls = { state->anchor.x + 16, state->anchor.y + 40 };
     Vector2 simulation = { state->anchor.x + 16, state->anchor.y + 112 };
     Vector2 drawing = { state->anchor.x + 16, state->anchor.y + 304 };

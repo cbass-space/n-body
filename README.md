@@ -16,19 +16,14 @@ A basic n-body simulation explorer to help learn C, Raylib, and the RK4 iterativ
 | `m` | Toggle if Planet is Movable |
 | Left-Mouse Drag | Set New Planet Velocity |
 
-## Todos
-- Field grid size slider
-
-
 ## Wants
 (in somewhat increasing order of i-dont-know-what-im-doing)
-- Fixed timestep for stability
-- Trajectory viewer?
 - Web build
 - Barnes-Hut?
 - Collisions?
 - Planet deletion
 - Classical gravitational field lines?
+- Generational indices over array deletion?
 - Scene saver / loader
     - Three body problem
     - Solar system

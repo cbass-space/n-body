@@ -1,5 +1,5 @@
 build
-scratch.md
-.vscode
+scratch
 compile_flags.txt
 .clangd
+.vscode
