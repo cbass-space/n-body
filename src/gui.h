@@ -10,81 +10,59 @@
 
 #include "constants.h"
 #include "simulation.h"
+#include "draw.h"
 
 #define RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT 24
 #define RAYGUI_WINDOW_CLOSEBUTTON_SIZE 18
 #define CLOSE_TITLE_SIZE_DELTA_HALF (RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT - RAYGUI_WINDOW_CLOSEBUTTON_SIZE) / 2
 
 typedef struct {
-    SimulationParameters *simulation;
-
-    Vector2 anchor;
     Rectangle layout[23];
+    Vector2 anchor;
     bool minimized;
     bool moving;
 
     bool reset;
     bool paused;
 
-    // something similar to simulation parameters?
-    f32 trail;
-    bool draw_relative;
-    bool draw_field_grid;
-    bool draw_velocity;
-    bool draw_forces;
-    bool draw_net_force;
-
     Color color;
     f32 mass;
     bool movable;
     bool create;
     bool previous_create;
-} GUI;
+} GUIState;
 
-GUI gui_init(SimulationParameters *simulation);
-void gui_draw(GUI *state);
+void gui_init(GUIState *gui);
+void gui_draw(GUIState *gui, SimulationParameters *simulation, DrawParameters *drawer);
 
 #ifdef GUI_IMPLEMENTATION
 
-// TODO: store pointer to simulation to udpate later
-void update_layout(GUI *state);
-GUI gui_init(SimulationParameters *simulation) {
+void update_layout(GUIState *state);
+void gui_init(GUIState *gui) {
     GuiLoadStyleDark();
-    GUI state = {
-        .simulation = simulation,
+    gui->anchor = (Vector2){ 24, 24 },
+    gui->minimized = false,
+    gui->moving = false,
 
-        .anchor = (Vector2){ 24, 24 },
-        .minimized = false,
-        .moving = false,
+    gui->paused = false,
 
-        .paused = false,
+    gui->color = COLOR_DEFAULT,
+    gui->mass = MASS_DEFAULT,
+    gui->movable = true,
+    gui->create = false,
+    gui->previous_create = false,
 
-        .trail = TRAIL_DEFAULT,
-        .draw_relative = false,
-        .draw_field_grid = false,
-        .draw_velocity = false,
-        .draw_forces = false,
-        .draw_net_force = false,
-
-        .color = COLOR_DEFAULT,
-        .mass = MASS_DEFAULT,
-        .movable = true,
-        .create = false,
-        .previous_create = false,
-    };
-
-    update_layout(&state);
-    return state;
+    update_layout(gui);
 }
 
-void gui_draw(GUI *gui) {
+void gui_draw(GUIState *gui, SimulationParameters *simulation, DrawParameters *drawer) {
     gui->previous_create = gui->create;
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && !gui->moving) {
         Rectangle title_collision_rect = {
             gui->anchor.x,
             gui->anchor.y,
-            gui->layout[0].width - (RAYGUI_WINDOW_CLOSEBUTTON_SIZE + (f32)CLOSE_TITLE_SIZE_DELTA_HALF),
+            gui->layout[0].width - (RAYGUI_WINDOW_CLOSEBUTTON_SIZE + (f32) CLOSE_TITLE_SIZE_DELTA_HALF),
             RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT
         };
         if(CheckCollisionPointRec(GetMousePosition(), title_collision_rect)) gui->moving = true;
@@ -108,8 +86,8 @@ void gui_draw(GUI *gui) {
 
     if (gui->minimized) {
         GuiStatusBar((Rectangle){ gui->anchor.x, gui->anchor.y, gui->layout[0].width, RAYGUI_WINDOWBOX_STATUSBAR_HEIGHT }, "N-Body Simulation");
-        if (GuiButton((Rectangle){ gui->anchor.x + gui->layout[0].width - RAYGUI_WINDOW_CLOSEBUTTON_SIZE - (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
-                                   gui->anchor.y + (f32)CLOSE_TITLE_SIZE_DELTA_HALF,
+        if (GuiButton((Rectangle){ gui->anchor.x + gui->layout[0].width - RAYGUI_WINDOW_CLOSEBUTTON_SIZE - (f32) CLOSE_TITLE_SIZE_DELTA_HALF,
+                                   gui->anchor.y + (f32) CLOSE_TITLE_SIZE_DELTA_HALF,
                                    RAYGUI_WINDOW_CLOSEBUTTON_SIZE,
                                    RAYGUI_WINDOW_CLOSEBUTTON_SIZE },
                                    "#120#")) {
@@ -123,20 +101,20 @@ void gui_draw(GUI *gui) {
         GuiToggle(gui->layout[3], "Pause", &gui->paused);
 
         GuiGroupBox(gui->layout[4], "Simulation Parameters");
-        GuiSlider(gui->layout[5], "Gravity", NULL, &gui->simulation->gravity, GRAVITY_MIN, GRAVITY_MAX);
-        GuiSlider(gui->layout[6], "Density", NULL, &gui->simulation->density, DENSITY_MIN, DENSITY_MAX);
-        GuiSlider(gui->layout[7], "Softening", NULL, &gui->simulation->softening, SOFTENING_MIN, SOFTENING_MAX);
-        GuiToggleGroup(gui->layout[8], "Euler;Verlet;RK4", (int *)&gui->simulation->integrator);
-        GuiToggleGroup(gui->layout[9], "None;Merge;Elastic", (int *)&gui->simulation->collisions);
-        GuiToggleGroup(gui->layout[10], "Direct;Barnes-Hut", (bool *)&gui->simulation->barnes_hut);
+        GuiSlider(gui->layout[5], "Gravity", NULL, &simulation->gravity, GRAVITY_MIN, GRAVITY_MAX);
+        GuiSlider(gui->layout[6], "Density", NULL, &simulation->density, DENSITY_MIN, DENSITY_MAX);
+        GuiSlider(gui->layout[7], "Softening", NULL, &simulation->softening, SOFTENING_MIN, SOFTENING_MAX);
+        GuiToggleGroup(gui->layout[8], "Euler;Verlet;RK4", (int*) &simulation->integrator);
+        GuiToggleGroup(gui->layout[9], "None;Merge;Elastic", (int*) &simulation->collisions);
+        GuiToggleGroup(gui->layout[10], "Direct;Barnes-Hut", (int*) &simulation->barnes_hut);
 
         GuiGroupBox(gui->layout[11], "Drawing Controls");
-        GuiSliderBar(gui->layout[12], "Trail Length", NULL, &gui->trail, TRAIL_MIN, TRAIL_MAX);
-        GuiCheckBox(gui->layout[13], "Relative Trail", &gui->draw_relative);
-        GuiCheckBox(gui->layout[14], "Draw Field Grid", &gui->draw_field_grid);
-        GuiCheckBox(gui->layout[15], "Draw Velocity", &gui->draw_velocity);
-        GuiCheckBox(gui->layout[16], "Draw Net Force", &gui->draw_net_force);
-        GuiCheckBox(gui->layout[17], "Draw Forces", &gui->draw_forces);
+        GuiSliderBar(gui->layout[12], "Trail Length", NULL, &drawer->trail, TRAIL_MIN, TRAIL_MAX);
+        GuiCheckBox(gui->layout[13], "Relative Trail", &drawer->draw_relative);
+        GuiCheckBox(gui->layout[14], "Draw Field Grid", &drawer->draw_field_grid);
+        GuiCheckBox(gui->layout[15], "Draw Velocity", &drawer->draw_velocity);
+        GuiCheckBox(gui->layout[16], "Draw Net Force", &drawer->draw_net_force);
+        GuiCheckBox(gui->layout[17], "Draw Forces", &drawer->draw_forces);
 
         GuiGroupBox(gui->layout[18], "New / Edit Body");
         GuiColorPicker(gui->layout[19], NULL, &gui->color);
@@ -147,7 +125,7 @@ void gui_draw(GUI *gui) {
 }
 
 // TODO: this is so bad
-void update_layout(GUI *state) {
+void update_layout(GUIState *state) {
     Vector2 controls = { state->anchor.x + 16, state->anchor.y + 40 };
     Vector2 simulation = { state->anchor.x + 16, state->anchor.y + 112 };
     Vector2 drawing = { state->anchor.x + 16, state->anchor.y + 304 };

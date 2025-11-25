@@ -3,16 +3,23 @@ TARGET  = main
 SOURCES = src/main.c
 BUILD   = build
 
-CFLAGS  = -std=c99 -Wall -g -fcolor-diagnostics -fansi-escape-codes -fsanitize=address
+CFLAGS  = -std=c99 -Wall -Wextra
 CFLAGS += -I.
-CFLAGS += -DGUI_IMPLEMENTATION -DSIM_IMPLEMENTATION -DDRAW_IMPLEMENTATION -DCAMERA_IMPLEMENTATION -DINPUT_IMPLEMENTATION -DAPP_IMPLEMENTATION
+CFLAGS += -DSIM_IMPLEMENTATION -DPREDICTOR_IMPLEMENTATION -DDRAW_IMPLEMENTATION -DCAMERA_IMPLEMENTATION -DGUI_IMPLEMENTATION -DAPP_IMPLEMENTATION
 LDFLAGS = $(shell pkg-config --libs raylib)
+
+DEBUG = -g -fcolor-diagnostics -fansi-escape-codes -fsanitize=address
+RELEASE = -O3 -march=native
 
 all: $(BUILD)/$(TARGET)
 
 $(BUILD)/$(TARGET): FORCE
 	mkdir -p $(BUILD)
-	$(CC) $(SOURCES) $(CFLAGS) $(LDFLAGS) -o $@
+	$(CC) $(SOURCES) $(CFLAGS) $(LDFLAGS) $(DEBUG) -o $@
+
+release: FORCE
+	mkdir -p $(BUILD)
+	$(CC) $(SOURCES) $(CFLAGS) $(LDFLAGS) $(RELEASE) -o $(BUILD)/release
 
 run: all
 	./$(BUILD)/$(TARGET)

@@ -18,6 +18,7 @@
 #define COLLISIONS_DEFAULT NONE
 #define BARNES_HUT_DEFAULT false
 
+// TODO: predict slider
 #define PREDICT_LENGTH 4096
 
 #define TRAIL_DEFAULT 128
@@ -32,4 +33,3 @@
 #define MASS_DEFAULT 100.0
 #define MASS_MIN 0.0
 #define MASS_MAX 5000.0
-
