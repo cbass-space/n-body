@@ -85,16 +85,38 @@ i32 app_init(Application *app) {
     SDL_SetGPUSwapchainParameters(app->gpu, app->window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
 
     // initialize modules
-    camera_init(&app->camera);
+    camera_init(&app->cam);
     if (simulation_init(&app->sim) != 0) return app_panic(app, "simulation_init() in app_init()", "Failed to initialize the simulation!");
-    if (graphics_init(&app->graphics, app->gpu, app->window) != 0) return app_panic(app, "graphics_init() in app_init()", "Failed to initialize graphics!");
+    if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return app_panic(app, "graphics_init() in app_init()", "Failed to initialize graphics!");
     if (gui_init(&app->gui, app->window, app->gpu) != 0) return app_panic(app, "gui_init() in app_init()", "Failed to initialize GUI!");
+
+    const NewBody body_a = {
+        .position = (HMM_Vec2) { .X = 0.0f, .Y = 100.0f },
+        .velocity = (HMM_Vec2) { .X = 30.0f, .Y = 0.0f },
+        .mass = 100.0f,
+        .movable = true,
+        .color = (SDL_FColor) { 1.0f, 1.0f, 1.0f, 1.0f },
+    };
+
+    const NewBody body_b = {
+        .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
+        .velocity = (HMM_Vec2) { .X = -30.0f, .Y = 0.0f },
+        .mass = 100.0f,
+        .movable = true,
+        .color = (SDL_FColor) { 1.0f, 1.0f, 1.0f, 1.0f },
+    };
+
+    simulation_push_body(&app->sim, &body_a);
+    simulation_push_body(&app->sim, &body_b);
+    graphics_push_body(&app->gfx, app->gpu, &body_a);
+    graphics_push_body(&app->gfx, app->gpu, &body_b);
+
     return 0;
 }
 
 void app_update(Application *app) {
-    gui_update(&app->options, &app->sim, &app->graphics, &app->camera);
-    camera_update(&app->camera, &app->sim);
+    gui_update(&app->options, &app->sim, &app->gfx, &app->cam);
+    camera_update(&app->cam, &app->sim);
 }
 
 void app_fixed_update(Application *app, const f64 delta_time) {
@@ -105,26 +127,26 @@ void app_event(Application *app, const SDL_Event *event) {
     gui_event(event);
 
     if (!app->gui.io->WantCaptureMouse) {
-        camera_mouse(&app->camera, event, app->window);
+        camera_mouse(&app->cam, event, app->window);
     }
 
     if (!app->gui.io->WantCaptureKeyboard) {
-        camera_keyboard(&app->camera, event, &app->sim);
+        camera_keyboard(&app->cam, event, &app->sim);
     }
 }
 
 void app_draw(Application *app) {
-    app->graphics.command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
-    SDL_WaitAndAcquireGPUSwapchainTexture(app->graphics.command_buffer, app->window, &app->graphics.swapchain, NULL, NULL);
-    if (!app->graphics.swapchain) {
-        SDL_SubmitGPUCommandBuffer(app->graphics.command_buffer);
+    app->gfx.command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
+    SDL_WaitAndAcquireGPUSwapchainTexture(app->gfx.command_buffer, app->window, &app->gfx.swapchain, NULL, NULL);
+    if (!app->gfx.swapchain) {
+        SDL_SubmitGPUCommandBuffer(app->gfx.command_buffer);
         return;
     };
 
-    graphics_draw(&app->graphics, app->gpu, app->window, &app->sim, &app->camera);
-    gui_draw(&app->gui, &app->graphics);
+    graphics_draw(&app->gfx, app->gpu, app->window, &app->sim, &app->cam);
+    gui_draw(&app->gui, &app->gfx);
 
-    SDL_SubmitGPUCommandBuffer(app->graphics.command_buffer);
+    SDL_SubmitGPUCommandBuffer(app->gfx.command_buffer);
 }
 
 void app_free(Application *app) {
@@ -132,7 +154,7 @@ void app_free(Application *app) {
     SDL_ReleaseWindowFromGPUDevice(app->gpu, app->window);
 
     simulation_free(&app->sim);
-    graphics_free(&app->graphics, app->gpu);
+    graphics_free(&app->gfx, app->gpu);
     gui_free();
 
     SDL_DestroyWindow(app->window);

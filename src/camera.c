@@ -6,33 +6,33 @@ void camera_init(Camera *cam) {
     cam->target = (usize) -1;
 }
 
-HMM_Vec2 screen_to_world(const Camera *camera, SDL_Window *window, HMM_Vec2 position) {
+HMM_Vec2 screen_to_world(const Camera *cam, SDL_Window *window, HMM_Vec2 position) {
     i32 width, height;
     SDL_GetWindowSize(window, &width, &height);
     const HMM_Vec2 center = (HMM_Vec2) { .X = (f32) width / 2.0f, .Y = (f32) height / 2.0f };
     position.Y = (f32) height - position.Y;
 
     HMM_Vec2 camera_to_point = HMM_SubV2(position, center);
-    camera_to_point = HMM_MulV2F(camera_to_point, camera->zoom);
-    return HMM_AddV2(camera->position, camera_to_point);
+    camera_to_point = HMM_MulV2F(camera_to_point, cam->zoom);
+    return HMM_AddV2(cam->position, camera_to_point);
 }
 
-HMM_Vec2 world_to_screen(const Camera *camera, SDL_Window *window, HMM_Vec2 position) {
+HMM_Vec2 world_to_screen(const Camera *cam, SDL_Window *window, HMM_Vec2 position) {
     i32 width, height;
     SDL_GetWindowSize(window, &width, &height);
     const HMM_Vec2 center = (HMM_Vec2) { .X = (f32) width / 2.0f, .Y = (f32) height / 2.0f };
 
-    HMM_Vec2 camera_to_point = HMM_SubV2(position, camera->position);
-    camera_to_point = HMM_DivV2F(camera_to_point, camera->zoom);
+    HMM_Vec2 camera_to_point = HMM_SubV2(position, cam->position);
+    camera_to_point = HMM_DivV2F(camera_to_point, cam->zoom);
     HMM_Vec2 screen = HMM_AddV2(center, camera_to_point);
     screen.Y = (f32) height - screen.Y;
     return screen;
 }
 
-HMM_Vec2 mouse_world_position(const Camera *camera, SDL_Window *window) {
+HMM_Vec2 mouse_world_position(const Camera *cam, SDL_Window *window) {
     HMM_Vec2 mouse = { 0 };
     SDL_GetMouseState(&mouse.X, &mouse.Y);
-    return screen_to_world(camera, window, mouse);
+    return screen_to_world(cam, window, mouse);
 }
 
 void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window) {

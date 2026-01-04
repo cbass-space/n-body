@@ -26,7 +26,7 @@
 #define GRAVITY_DEFAULT 10000.0f
 #define SOFTENING_DEFAULT 0.01f
 #define DENSITY_DEFAULT 0.001f
-#define INTEGRATOR_DEFAULT EULER
+#define INTEGRATOR_DEFAULT INTEGRATOR_VERLET
 #define COLLISIONS_DEFAULT NONE
 #define BARNES_HUT_DEFAULT false
 
@@ -50,9 +50,9 @@ typedef struct {
 } NewBody;
 
 typedef enum {
-    EULER,
-    VERLET,
-    RK4,
+    INTEGRATOR_EULER,
+    INTEGRATOR_VERLET,
+    INTEGRATOR_RK4,
 } Integrator;
 
 typedef enum {
@@ -83,7 +83,7 @@ typedef struct {
 } Simulation;
 
 i32 simulation_init(Simulation *sim);
-void simulation_add_body(Simulation *sim, const NewBody *body);
+void simulation_push_body(Simulation *sim, const NewBody *body);
 void simulation_update(Simulation *sim, f64 dt);
 void simulation_free(Simulation *sim);
 f32 body_radius(const Simulation *sim, f32 mass);
@@ -100,11 +100,28 @@ void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window);
 void camera_keyboard(Camera *cam, const SDL_Event *event, const Simulation *sim);
 void camera_update(Camera *cam, const Simulation *sim);
 
-HMM_Vec2 screen_to_world(const Camera *camera, SDL_Window *window, HMM_Vec2 position);
-HMM_Vec2 world_to_screen(const Camera *camera, SDL_Window *window, HMM_Vec2 position);
-HMM_Vec2 mouse_world_position(const Camera *camera, SDL_Window *window);
+HMM_Vec2 screen_to_world(const Camera *cam, SDL_Window *window, HMM_Vec2 position);
+HMM_Vec2 world_to_screen(const Camera *cam, SDL_Window *window, HMM_Vec2 position);
+HMM_Vec2 mouse_world_position(const Camera *cam, SDL_Window *window);
 
 // GRAPHICS //
+
+typedef enum {
+    DIRTY_NONE,
+    DIRTY_MASS,
+    DIRTY_MOVABLE,
+    DIRTY_COLOR,
+} GraphicsDirtyType;
+
+typedef struct {
+    GraphicsDirtyType type;
+    usize index;
+    union {
+        f32 mass;
+        bool movable;
+        SDL_FColor color;
+    };
+} GraphicsDirtyFlag;
 
 typedef struct {
     SDL_FColor clear_color;
@@ -115,24 +132,28 @@ typedef struct {
 
 typedef struct {
     GraphicsOptions options;
+    GraphicsDirtyFlag dirty_flag;
+
+    u32 trail_counter;
+    u32 *offsets;
+    SDL_FColor *colors;
 
     SDL_GPUCommandBuffer *command_buffer;
     SDL_GPUTexture *swapchain;
 
-    GPUArray trail_positions;
-    GPUArray trail_offsets;
-    GPUArray colors;
-    GPUArray masses;
-    u32 *offsets;
-    u32 trail_counter;
+    GPUArray gpu_trails;
+    GPUArray gpu_offsets;
+    GPUArray gpu_masses;
+    GPUArray gpu_movables;
+    GPUArray gpu_colors;
 
     SDL_GPUGraphicsPipeline *circle_pipeline;
     SDL_GPUGraphicsPipeline *trail_pipeline;
 } Graphics;
 
 i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window);
-void graphics_push_body(Graphics *gfx, SDL_GPUDevice *gpu, const NewBody *body);
-void graphics_draw(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window, const Simulation *sim, const Camera *camera);
+usize graphics_push_body(Graphics *gfx, SDL_GPUDevice *gpu, const NewBody *body);
+void graphics_draw(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window, const Simulation *sim, const Camera *cam);
 void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu);
 
 // GUI //
@@ -163,8 +184,8 @@ typedef struct {
     SDL_Window *window;
     SDL_GPUDevice *gpu;
     Simulation sim;
-    Camera camera;
-    Graphics graphics;
+    Camera cam;
+    Graphics gfx;
     Gui gui;
 } Application;
 

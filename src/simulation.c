@@ -15,7 +15,7 @@ i32 simulation_init(Simulation *sim) {
     return 0;
 }
 
-void simulation_add_body(Simulation *sim, const NewBody *body) {
+void simulation_push_body(Simulation *sim, const NewBody *body) {
     arrput(sim->r, body->position);
     arrput(sim->v, body->velocity);
     arrput(sim->m, body->mass);
@@ -34,13 +34,13 @@ void simulation_update(Simulation *sim, const f64 dt) {
         }
 
         switch (sim->options.integrator) {
-            case EULER:
+            case INTEGRATOR_EULER:
                 integrate_euler(sim, i, (f32) dt);
                 break;
-            case VERLET:
+            case INTEGRATOR_VERLET:
                 integrate_verlet(sim, i, (f32) dt);
                 break;
-            case RK4:
+            case INTEGRATOR_RK4:
                 integrate_rk4(sim, i, (f32) dt);
                 break;
         }

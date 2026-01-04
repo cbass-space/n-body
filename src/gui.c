@@ -33,8 +33,6 @@ i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
 }
 
 static void HelpMarker(const char* desc);
-static void gui_simulation_options(ApplicationOptions *app, SimulationOptions *simulation);
-static void gui_drawing_options(GraphicsOptions *graphics);
 void gui_update(ApplicationOptions *app, Simulation *sim, Graphics *gfx, Camera *cam) {
     cImGui_ImplSDLGPU3_NewFrame();
     cImGui_ImplSDL3_NewFrame();
@@ -46,7 +44,7 @@ void gui_update(ApplicationOptions *app, Simulation *sim, Graphics *gfx, Camera 
         ImGui_Text("Thanks for coming :)");
     }
 
-    if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
+    if (ImGui_CollapsingHeader("Create Body", 0)) {
         ImGui_Checkbox("Body creation mode!", &app->create_mode);
         HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
         ImGui_BeginDisabled(!app->create_mode);
@@ -63,11 +61,28 @@ void gui_update(ApplicationOptions *app, Simulation *sim, Graphics *gfx, Camera 
         ImGui_SeparatorText("Edit Bodies");
         for (usize i = 0; i < arrlenu(sim->r); i++) {
             ImGui_PushIDInt((i32) i);
-            if (ImGui_TreeNodeStr("", "Body %d", (i32) i)) {
-                ImGui_DragFloat("Mass", &sim->m[i]);
+            if (ImGui_TreeNodeExStr("", ImGuiTreeNodeFlags_DefaultOpen, "Body %d", (i32) i)) {
+                if (ImGui_ColorEdit3("Color", (f32*) &gfx->colors[i], 0)) gfx->dirty_flag = (GraphicsDirtyFlag) {
+                    .type = DIRTY_COLOR,
+                    .index = i,
+                    .color = gfx->colors[i]
+                };
+
+                if (ImGui_DragFloat("Mass", &sim->m[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
+                    .type = DIRTY_MASS,
+                    .index = i,
+                    .mass = sim->m[i]
+                };
+
                 ImGui_DragFloat2("Position", (f32*) &sim->r[i]);
                 ImGui_DragFloat2("Velocity", (f32*) &sim->v[i]);
-                ImGui_Checkbox("Movable", &sim->movable[i]);
+
+                if (ImGui_Checkbox("Movable", &sim->movable[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
+                    .type = DIRTY_MOVABLE,
+                    .index = i,
+                    .movable = sim->movable[i]
+                };
+
                 if (ImGui_Button("Follow Body")) cam->target = i;
                 ImGui_TreePop();
             }
@@ -79,59 +94,50 @@ void gui_update(ApplicationOptions *app, Simulation *sim, Graphics *gfx, Camera 
         ImGui_SeparatorText("Controls");
         ImGui_Checkbox("Pause Simulation", &app->paused);
         ImGui_Button("Reset Simulation");
-        gui_simulation_options(app, &sim->options);
-        gui_drawing_options(&gfx->options);
+        SimulationOptions *simulation = &sim->options;
+
+        ImGui_SeparatorText("Simulation Options");
+        ImGui_DragFloat("Time Step", &app->fixed_delta_time);
+        ImGui_DragFloat("Gravity Coefficient", &simulation->gravity);
+        HelpMarker("Strength of the gravitational force between two bodies.");
+        ImGui_DragFloat("Softening Coefficient", &simulation->softening);
+        HelpMarker("How much to reduce the gravitational force between two bodies on close encounter for numerical stability.");
+        ImGui_DragFloat("Density Coefficient", &simulation->density);
+        HelpMarker("How dense each body is.");
+        const char *integrators[] = { "Semi-Implicit Euler", "Velocity Verlet", "Runge-Kutta 4" };
+        ImGui_ComboChar("Integrator", (i32*) &simulation->integrator, integrators, IM_ARRAYSIZE(integrators));
+        HelpMarker("The algorithm used to calculate the new velocity and position of each body given the acceleration. Euler is the most performant, Verlet is more accurate while still conserving energy, and RK4 is the most accurate across short time spans but does not conserve energy.");
+        const char *collisions[] = { "No Collisions", "Merge on Collision", "Bounce on Collision" };
+        ImGui_ComboChar("Collisions", (i32*) &simulation->collisions, collisions, IM_ARRAYSIZE(collisions));
+        HelpMarker("How to handle body collisions.");
+        if (simulation->collisions == BOUNCE) {
+            static f32 cor = 1.0f;
+            ImGui_SliderFloat("Restitution Coefficient", &cor, 0.0f, 1.0f);
+            HelpMarker("A coefficient of 0.0 leads to a perfectly inelastic collision, while a coefficient of 1.0 is a perfectly elastic collision.");
+        }
+        ImGui_Checkbox("Use Barnes-Hut Optimization", &simulation->barnes_hut);
+        HelpMarker("Whether to use a quadtree to calculate the gravitational force on a body (more performant) or calculate the force directly (more accurate).");
+        if (simulation->barnes_hut) {
+            static bool draw = false;
+            static u8 max_leaves = 1;
+            ImGui_SeparatorText("Barnes-Hut Parameters");
+            ImGui_Checkbox("Draw quadtree", &draw);
+            ImGui_SliderInt("Bodies per Leaf Node", (i32*) &max_leaves, 1, 256);
+            HelpMarker("The maximum number of bodies per leaf node of the quadtree.");
+        }
+
+        GraphicsOptions *graphics = &gfx->options;
+        ImGui_SeparatorText("Drawing Options");
+        ImGui_ColorEdit3("Space Color", (f32*) &graphics->clear_color, 0);
+        ImGui_SliderFloat("Movable Body Outline", &graphics->movable_outline, 0.0f, 1.0f);
+        HelpMarker("The thickness of the outline around movable bodies.");
+        ImGui_SliderFloat("Static Body Outline", &graphics->static_outline, 0.0f, 1.0f);
+        HelpMarker("The thickness of the outline around non-movable bodies.");
+        ImGui_SliderFloat("Trail brightness", &graphics->trail_brightness, 0.0f, 1.0f);
+        HelpMarker("The brightness of the trail that each body leaves behind as it moves.");
     }
 
     ImGui_End();
-}
-
-static void gui_simulation_options(ApplicationOptions *app, SimulationOptions *simulation) {
-    ImGui_SeparatorText("Simulation Options");
-
-    ImGui_DragFloat("Time Step", &app->fixed_delta_time);
-    ImGui_DragFloat("Gravity Coefficient", &simulation->gravity);
-    HelpMarker("Strength of the gravitational force between two bodies.");
-    ImGui_DragFloat("Softening Coefficient", &simulation->softening);
-    HelpMarker("How much to reduce the gravitational force between two bodies on close encounter for numerical stability.");
-    ImGui_DragFloat("Density Coefficient", &simulation->density);
-    HelpMarker("How dense each body is.");
-
-    const char *integrators[] = { "Semi-Implicit Euler", "Velocity Verlet", "Runge-Kutta 4" };
-    ImGui_ComboChar("Integrator", (i32*) &simulation->integrator, integrators, IM_ARRAYSIZE(integrators));
-    HelpMarker("The algorithm used to calculate the new velocity and position of each body given the acceleration. Euler is the most performant, Verlet is more accurate while still conserving energy, and RK4 is the most accurate across short time spans but does not conserve energy.");
-
-    const char *collisions[] = { "No Collisions", "Merge on Collision", "Bounce on Collision" };
-    ImGui_ComboChar("Collisions", (i32*) &simulation->collisions, collisions, IM_ARRAYSIZE(collisions));
-    HelpMarker("How to handle body collisions.");
-    if (simulation->collisions == BOUNCE) {
-        static f32 cor = 1.0f;
-        ImGui_SliderFloat("Restitution Coefficient", &cor, 0.0f, 1.0f);
-        HelpMarker("A coefficient of 0.0 leads to a perfectly inelastic collision, while a coefficient of 1.0 is a perfectly elastic collision.");
-    }
-
-    ImGui_Checkbox("Use Barnes-Hut Optimization", &simulation->barnes_hut);
-    HelpMarker("Whether to use a quadtree to calculate the gravitational force on a body (more performant) or calculate the force directly (more accurate).");
-    if (simulation->barnes_hut) {
-        static bool draw = false;
-        static u8 max_leaves = 1;
-        ImGui_SeparatorText("Barnes-Hut Parameters");
-        ImGui_Checkbox("Draw quadtree", &draw);
-        ImGui_SliderInt("Bodies per Leaf Node", (i32*) &max_leaves, 1, 256);
-        HelpMarker("The maximum number of bodies per leaf node of the quadtree.");
-    }
-}
-
-static void gui_drawing_options(GraphicsOptions *graphics) {
-    ImGui_SeparatorText("Drawing Options");
-
-    ImGui_ColorEdit3("Space Color", (f32*) &graphics->clear_color, 0);
-    ImGui_SliderFloat("Movable Body Outline", &graphics->movable_outline, 0.0f, 1.0f);
-    HelpMarker("The thickness of the outline around movable bodies.");
-    ImGui_SliderFloat("Static Body Outline", &graphics->static_outline, 0.0f, 1.0f);
-    HelpMarker("The thickness of the outline around non-movable bodies.");
-    ImGui_SliderFloat("Trail brightness", &graphics->trail_brightness, 0.0f, 1.0f);
-    HelpMarker("The brightness of the trail that each body leaves behind as it moves.");
 }
 
 static void HelpMarker(const char* desc) {

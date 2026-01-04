@@ -13,7 +13,7 @@ typedef struct {
     const char *fragment_shader_path;
     SDL_GPUPrimitiveType primitive_type;
 } CreateGPUGraphicsPipelineInfo;
-SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, CreateGPUGraphicsPipelineInfo *info);
+SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info);
 SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path);
 
 typedef struct {
@@ -56,7 +56,7 @@ SDL_GPUColorTargetBlendState BLEND_STATE = {
     .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA
 };
 
-SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, CreateGPUGraphicsPipelineInfo *info) {
+SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info) {
     SDL_GPUShader *vertex_shader = LoadSPIRVShader(gpu, info->vertex_shader_path);
     SDL_GPUShader *fragment_shader = LoadSPIRVShader(gpu, info->fragment_shader_path);
     SDL_GPUGraphicsPipeline *pipeline = SDL_CreateGPUGraphicsPipeline(gpu, &(SDL_GPUGraphicsPipelineCreateInfo) {
@@ -87,7 +87,7 @@ SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path) {
     }
 
     usize shader_size;
-    void *shader_code = SDL_LoadFile(shader_path, &shader_size);
+    const void *shader_code = SDL_LoadFile(shader_path, &shader_size);
     if (shader_code == NULL) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_LoadFile() in LoadSPIRV(): Couldn't find shader at path %s.\n", shader_path);
         return NULL;
@@ -115,7 +115,7 @@ void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const 
     });
 
     u32 data_offset = 0;
-    void *data = SDL_MapGPUTransferBuffer(gpu, transfer_buffer, false);
+    u8 *data = SDL_MapGPUTransferBuffer(gpu, transfer_buffer, false);
     for (usize i = 0; i < num_bindings; i++) {
         SDL_memcpy(data + data_offset, bindings[i].source + bindings[i].source_offset, bindings[i].size);
         data_offset += bindings[i].size;
