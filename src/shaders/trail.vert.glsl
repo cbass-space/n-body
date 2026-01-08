@@ -11,15 +11,23 @@ layout (std140, set = 1, binding = 0) uniform TransformUniform {
     mat4 orthographic;
     mat4 view;
 };
-layout (std140, set = 1, binding = 1) uniform CounterUniform { uint counter; };
-layout (std140, set = 1, binding = 2) uniform ConstantsUniform {
-    vec3 padding;
+
+layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
+    vec3 _padding;
+    uint counter;
     float brightness;
+    uint target;
 };
 
 void main() {
     uint current = counter - offsets[gl_InstanceIndex];
     vec2 position = positions[gl_InstanceIndex][(current - gl_VertexIndex) % TRAIL_LENGTH];
+    if (target != uint(-1)) {
+        uint current_target = counter - offsets[target];
+        position += positions[target][current_target % TRAIL_LENGTH]
+            - positions[target][(current_target - gl_VertexIndex) % TRAIL_LENGTH];
+    }
+
     gl_Position = orthographic * view * vec4(position, 0.0, 1.0);
 
     float alpha = brightness * (1.0 - float(gl_VertexIndex) / float(TRAIL_LENGTH));

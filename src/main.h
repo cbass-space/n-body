@@ -1,24 +1,25 @@
 #ifndef N_BODY_MAIN
 #define N_BODY_MAIN
 
-#include "HandmadeMath.h"
-
 #include "SDL3/SDL_gpu.h"
 #include "dcimgui.h"
+#include "HandmadeMath.h"
 
 #include "types.h"
 #include "sdl_utils.h"
+
+// TODO: maybe make main.h only public fields?
 
 // CONSTANTS //
 
 // application defaults
 #define WIDTH_DEFAULT 1200
 #define HEIGHT_DEFAULT 900
-#define FIXED_DELTA_TIME_DEFAULT 0.01f // add slider?
+#define FIXED_DELTA_TIME_DEFAULT 0.01f
 #define TRAIL_LENGTH 256
 #define EPSILON 1e-6f
 
-// body defaults
+// new body defaults
 #define MASS_DEFAULT 50.0f
 #define COLOR_DEFAULT (SDL_FColor) { 1.0f, 1.0f, 1.0f, 1.0f }
 
@@ -27,7 +28,7 @@
 #define SOFTENING_DEFAULT 0.01f
 #define DENSITY_DEFAULT 0.001f
 #define INTEGRATOR_DEFAULT INTEGRATOR_VERLET
-#define COLLISIONS_DEFAULT NONE
+#define COLLISIONS_DEFAULT COLLISIONS_NONE
 #define BARNES_HUT_DEFAULT false
 
 // graphics defaults
@@ -42,34 +43,23 @@
 // SIMULATION //
 
 typedef struct {
-    HMM_Vec2 position;
-    HMM_Vec2 velocity;
-    f32 mass;
-    bool movable;
-    SDL_FColor color;
-} NewBody;
-
-typedef enum {
-    INTEGRATOR_EULER,
-    INTEGRATOR_VERLET,
-    INTEGRATOR_RK4,
-} Integrator;
-
-typedef enum {
-    NONE,
-    MERGE,
-    BOUNCE
-} Collisions;
-
-typedef struct {
-    Integrator integrator;
-    Collisions collisions;
+    enum {
+        INTEGRATOR_EULER,
+        INTEGRATOR_VERLET,
+        INTEGRATOR_RK4,
+    } integrator;
+    enum {
+        COLLISIONS_NONE,
+        COLLISIONS_MERGE,
+        COLLISIONS_BOUNCE
+    } collisions;
     f32 gravity;
     f32 softening;
     f32 density;
     bool barnes_hut;
 } SimulationOptions;
 
+// not sure about this chief
 typedef struct {
     SimulationOptions options;
     /// body positions
@@ -82,8 +72,15 @@ typedef struct {
     bool *movable;
 } Simulation;
 
-i32 simulation_init(Simulation *sim);
-void simulation_push_body(Simulation *sim, const NewBody *body);
+void simulation_init(Simulation *sim);
+typedef struct {
+    HMM_Vec2 position;
+    HMM_Vec2 velocity;
+    f32 mass;
+    bool movable;
+} SimulationAddBodyInfo;
+
+usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body);
 void simulation_update(Simulation *sim, f64 dt);
 void simulation_free(Simulation *sim);
 f32 body_radius(const Simulation *sim, f32 mass);
@@ -91,30 +88,44 @@ f32 body_radius(const Simulation *sim, f32 mass);
 // CAMERA //
 typedef struct {
     HMM_Vec2 position;
-    f32 zoom;
     usize target;
+    f32 zoom;
 } Camera;
 
 void camera_init(Camera *cam);
-void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window);
+void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, bool ghost_mode);
 void camera_keyboard(Camera *cam, const SDL_Event *event, const Simulation *sim);
 void camera_update(Camera *cam, const Simulation *sim);
-
 HMM_Vec2 screen_to_world(const Camera *cam, SDL_Window *window, HMM_Vec2 position);
 HMM_Vec2 world_to_screen(const Camera *cam, SDL_Window *window, HMM_Vec2 position);
 HMM_Vec2 mouse_world_position(const Camera *cam, SDL_Window *window);
 
-// GRAPHICS //
-
-typedef enum {
-    DIRTY_NONE,
-    DIRTY_MASS,
-    DIRTY_MOVABLE,
-    DIRTY_COLOR,
-} GraphicsDirtyType;
+// CREATION GHOST BODY //
 
 typedef struct {
-    GraphicsDirtyType type;
+    SDL_FColor color;
+    HMM_Vec2 position;
+    HMM_Vec2 velocity;
+    HMM_Vec2 relative_position;
+    f32 mass;
+    bool movable;
+    bool mode;
+} Ghost;
+
+void ghost_init(Ghost *ghost);
+void ghost_update(Ghost *ghost, SDL_Window *window, const Simulation *sim, const Camera *cam);
+bool ghost_mouse(Ghost *ghost, const SDL_Event *event);
+void ghost_keyboard(Ghost *ghost, const SDL_Event *event);
+
+// GRAPHICS //
+
+typedef struct {
+    enum {
+        DIRTY_NONE,
+        DIRTY_MASS,
+        DIRTY_MOVABLE,
+        DIRTY_COLOR,
+    } type;
     usize index;
     union {
         f32 mass;
@@ -138,22 +149,33 @@ typedef struct {
     u32 *offsets;
     SDL_FColor *colors;
 
-    SDL_GPUCommandBuffer *command_buffer;
-    SDL_GPUTexture *swapchain;
+    SDL_GPUGraphicsPipeline *circle_pipeline;
+    SDL_GPUGraphicsPipeline *trail_pipeline;
+    SDL_GPUGraphicsPipeline *ghost_pipeline;
 
     GPUArray gpu_trails;
     GPUArray gpu_offsets;
     GPUArray gpu_masses;
     GPUArray gpu_movables;
     GPUArray gpu_colors;
-
-    SDL_GPUGraphicsPipeline *circle_pipeline;
-    SDL_GPUGraphicsPipeline *trail_pipeline;
 } Graphics;
 
 i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window);
-usize graphics_push_body(Graphics *gfx, SDL_GPUDevice *gpu, const NewBody *body);
-void graphics_draw(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window, const Simulation *sim, const Camera *cam);
+typedef struct {
+    SDL_GPUDevice *gpu;
+    SDL_FColor color;
+    const Simulation *sim;
+    usize index;
+} GraphicsAddBodyInfo;
+usize graphics_add_body(Graphics *gfx, GraphicsAddBodyInfo *info);
+typedef struct {
+    SDL_GPUDevice *gpu;
+    SDL_Window *window;
+    const Simulation *sim;
+    const Ghost *ghost;
+    const Camera *cam;
+} GraphicsDrawInfo;
+void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info);
 void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu);
 
 // GUI //
@@ -161,9 +183,6 @@ void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu);
 typedef struct {
     f32 fixed_delta_time;
     bool paused;
-
-    bool create_mode;
-    NewBody create_body;
 } ApplicationOptions;
 
 typedef struct {
@@ -171,32 +190,30 @@ typedef struct {
 } Gui;
 
 i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu);
-void gui_update(ApplicationOptions *app, Simulation *sim, Graphics *gfx, Camera *cam);
+typedef struct {
+    ApplicationOptions *app;
+    Simulation *sim;
+    Graphics *gfx;
+    Camera *cam;
+    Ghost *ghost;
+} GuiUpdateInfo;
+void gui_update(const GuiUpdateInfo *info);
 void gui_event(const SDL_Event *event);
-void gui_draw(const Gui *gui, const Graphics *gfx);
 void gui_free(void);
 
 // APP //
 
 typedef struct {
     ApplicationOptions options;
-
     SDL_Window *window;
     SDL_GPUDevice *gpu;
     Simulation sim;
+    Ghost ghost;
     Camera cam;
     Graphics gfx;
     Gui gui;
 } Application;
 
-i32 panic(const char *location, const char *message);
-
-i32 app_init(Application *app);
-i32 app_panic(Application *app, const char *location, const char *message);
-void app_update(Application *app);
-void app_fixed_update(Application *app, f64 delta_time);
-void app_event(Application *app, const SDL_Event *event);
-void app_draw(Application *app);
-void app_free(Application *app);
+SDL_AppResult panic(const char *location, const char *message);
 
 #endif

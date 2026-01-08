@@ -23,6 +23,7 @@ add_executable(main WIN32
     src/gui.c
     src/graphics.c
     src/camera.c
+    src/ghost.c
 )
 
 target_include_directories(main PRIVATE lib)

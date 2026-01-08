@@ -2,7 +2,7 @@
 
 #include "main.h"
 
-i32 simulation_init(Simulation *sim) {
+void simulation_init(Simulation *sim) {
     sim->options = (SimulationOptions) {
         .gravity = GRAVITY_DEFAULT,
         .softening = SOFTENING_DEFAULT,
@@ -11,15 +11,15 @@ i32 simulation_init(Simulation *sim) {
         .collisions = COLLISIONS_DEFAULT,
         .barnes_hut = BARNES_HUT_DEFAULT
     };
-
-    return 0;
 }
 
-void simulation_push_body(Simulation *sim, const NewBody *body) {
+usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body) {
+    const usize index = arrlenu(sim->r);
     arrput(sim->r, body->position);
     arrput(sim->v, body->velocity);
     arrput(sim->m, body->mass);
     arrput(sim->movable, body->movable);
+    return index;
 }
 
 static void integrate_euler(const Simulation *sim, usize i, f32 dt);
@@ -144,7 +144,7 @@ static KinematicState rk4_delta(const KinematicState state, const Simulation *si
 static void collide_elastic(const Simulation *sim, usize i, usize j);
 static void collide_merge(const Simulation *sim, usize i, usize j);
 static void collide_bodies(const Simulation *sim) {
-    if (sim->options.collisions == NONE) return;
+    if (sim->options.collisions == COLLISIONS_NONE) return;
 
     // TODO: bucket or quadtree optimization?
     for (usize i = 0; i < arrlenu(sim->r); i++) {
@@ -158,8 +158,8 @@ static void collide_bodies(const Simulation *sim) {
             const HMM_Vec2 relative_velocity = HMM_SubV2(sim->v[i], sim->v[j]);
             if (HMM_DotV2(delta, relative_velocity) > 0.0) continue;
 
-            if (sim->options.collisions == BOUNCE) collide_elastic(sim, i, j);
-            if (sim->options.collisions == MERGE) collide_merge(sim, i, j);
+            if (sim->options.collisions == COLLISIONS_BOUNCE) collide_elastic(sim, i, j);
+            if (sim->options.collisions == COLLISIONS_MERGE) collide_merge(sim, i, j);
         }
     }
 }

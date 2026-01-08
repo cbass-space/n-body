@@ -1,7 +1,7 @@
 #version 460
 
 struct VertexOut {
-    vec3 color;
+    vec4 color;
     vec2 position;
     float outline;
 };
@@ -19,23 +19,24 @@ layout (std140, set = 1, binding = 0) uniform TransformUniform {
     mat4 orthographic;
     mat4 view;
 };
-layout (std140, set = 1, binding = 1) uniform CounterUniform { uint counter; };
-layout (std140, set = 1, binding = 2) uniform ConstantsUniform {
+
+layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
     float density;
     float movable_outline;
     float static_outline;
-    float padding;
+    uint counter;
+    vec2 _padding;
 };
 
 float compute_radius(float mass) {
-    return pow(mass / density, 1.0/3.0);
+    return pow(mass / density, 1.0 / 3.0);
 }
 
 void main() {
-    frag.color = colors[gl_InstanceIndex].rgb;
+    frag.color = colors[gl_InstanceIndex];
     frag.position.x = 2.0 * floor(gl_VertexIndex / 2.0) - 1.0;
     frag.position.y = 2.0 * mod(gl_VertexIndex, 2.0) - 1.0;
-    frag.outline = movable[gl_InstanceIndex] == 0.0 ? static_outline : movable_outline;
+    frag.outline = movable[gl_InstanceIndex] == 1.0 ? movable_outline : static_outline;
 
     float radius = compute_radius(masses[gl_InstanceIndex]);
     uint current = (counter - offsets[gl_InstanceIndex]) % TRAIL_LENGTH;
