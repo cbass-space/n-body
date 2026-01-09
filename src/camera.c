@@ -46,12 +46,13 @@ void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, const
 
     if (event->type == SDL_EVENT_MOUSE_WHEEL && !ghost_mode) {
         const HMM_Vec2 mouse_old = mouse_world_position(cam, window);
-
         cam->zoom *= SDL_expf(event->wheel.y * -0.1f);
 
-        const HMM_Vec2 mouse_new = mouse_world_position(cam, window);
-        const HMM_Vec2 delta = HMM_SubV2(mouse_new, mouse_old);
-        cam->position = HMM_SubV2(cam->position, delta);
+        if (cam->target == (usize) -1) {
+            const HMM_Vec2 mouse_new = mouse_world_position(cam, window);
+            const HMM_Vec2 delta = HMM_SubV2(mouse_new, mouse_old);
+            cam->position = HMM_SubV2(cam->position, delta);
+        }
     }
 }
 

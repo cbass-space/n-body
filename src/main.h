@@ -146,7 +146,6 @@ typedef struct {
     GraphicsDirtyFlag dirty_flag;
 
     u32 trail_counter;
-    u32 *offsets;
     SDL_FColor *colors;
 
     SDL_GPUGraphicsPipeline *circle_pipeline;
@@ -154,7 +153,6 @@ typedef struct {
     SDL_GPUGraphicsPipeline *ghost_pipeline;
 
     GPUArray gpu_trails;
-    GPUArray gpu_offsets;
     GPUArray gpu_masses;
     GPUArray gpu_movables;
     GPUArray gpu_colors;
@@ -176,7 +174,7 @@ typedef struct {
     const Camera *cam;
 } GraphicsDrawInfo;
 void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info);
-void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu);
+void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu);
 
 // GUI //
 

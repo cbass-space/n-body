@@ -40,12 +40,10 @@ i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window) {
     if (!gfx->ghost_pipeline) return panic("SDL_CreateGPUGraphicsPipeline() in graphics_init()", "Failed to create ghost graphics pipeline!");
 
     gfx->gpu_trails = CreateGPUArray(gpu, TRAIL_SIZE);
-    gfx->gpu_offsets = CreateGPUArray(gpu, sizeof(u32));
     gfx->gpu_masses = CreateGPUArray(gpu, sizeof(f32));
     gfx->gpu_movables = CreateGPUArray(gpu, sizeof(f32));
     gfx->gpu_colors = CreateGPUArray(gpu, sizeof(SDL_FColor));
     if (!gfx->gpu_trails.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create trail storage buffer!");
-    if (!gfx->gpu_offsets.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create trail offsets buffer!");
     if (!gfx->gpu_masses.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create mass storage buffer!");
     if (!gfx->gpu_movables.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create movables buffer!");
     if (!gfx->gpu_colors.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create color storage buffer!");
@@ -61,7 +59,6 @@ usize graphics_add_body(Graphics *gfx, GraphicsAddBodyInfo *info) {
 
     const AppendGPUArrayBinding bindings[] = {
         { .array = &gfx->gpu_trails, .source = (u8*) &trail_positions, .size = TRAIL_SIZE },
-        { .array = &gfx->gpu_offsets, .source = (u8*) &gfx->trail_counter, .size = sizeof(u32) },
         { .array = &gfx->gpu_masses, .source = (u8*) &info->sim->m[info->index], .size = sizeof(f32) },
         { .array = &gfx->gpu_movables, .source = (u8*) &(f32) { info->sim->movable[info->index] }, .size = sizeof(f32) },
         { .array = &gfx->gpu_colors, .source = (u8*) &info->color, .size = sizeof(SDL_FColor) },
@@ -69,12 +66,11 @@ usize graphics_add_body(Graphics *gfx, GraphicsAddBodyInfo *info) {
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(info->gpu);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    AppendGPUArrays(info->gpu, copy_pass, bindings, 5);
+    AppendGPUArrays(info->gpu, copy_pass, bindings, sizeof(bindings) / sizeof(AppendGPUArrayBinding));
     SDL_EndGPUCopyPass(copy_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
-    const usize index = arrlenu(gfx->offsets);
-    arrput(gfx->offsets, gfx->trail_counter);
+    const usize index = arrlenu(gfx->colors);
     arrput(gfx->colors, info->color);
     return index;
 }
@@ -168,21 +164,18 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
     SDL_PushGPUVertexUniformData(command_buffer, 0, &matrices, sizeof(matrices));
     SDL_PushGPUVertexUniformData(command_buffer, 1, &constants, sizeof(constants));
 
-    UploadGPUBufferBinding *position_bindings = SDL_malloc(sizeof(UploadGPUBufferBinding) * arrlenu(gfx->offsets));
-    for (usize i = 0; i < arrlenu(gfx->offsets); i++) {
-        const u32 buffer_offset = (i * TRAIL_SIZE)
-            + ((gfx->trail_counter - gfx->offsets[i]) % TRAIL_LENGTH)
-            * sizeof(HMM_Vec2);
-        position_bindings[i] = (UploadGPUBufferBinding) {
+    UploadGPUBufferBinding *position_bindings = SDL_malloc(sizeof(UploadGPUBufferBinding) * arrlenu(gfx->colors));
+    for (usize i = 0; i < arrlenu(gfx->colors); i++) {
+        position_bindings[i] = (UploadGPUBufferBinding){
             .buffer = gfx->gpu_trails.buffer,
-            .source = (u8*) &info->sim->r[i],
+            .source = (u8 *) &info->sim->r[i],
             .size = sizeof(HMM_Vec2),
-            .buffer_offset = buffer_offset,
+            .buffer_offset = (i * TRAIL_SIZE + gfx->trail_counter * sizeof(HMM_Vec2)),
         };
     }
 
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    UploadIntoGPUBuffers(info->gpu, copy_pass, position_bindings, arrlen(gfx->offsets));
+    UploadIntoGPUBuffers(info->gpu, copy_pass, position_bindings, arrlen(gfx->colors));
     SDL_EndGPUCopyPass(copy_pass);
     SDL_free(position_bindings);
 
@@ -196,13 +189,12 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
     if (arrlenu(gfx->colors)) {
         SDL_GPUBuffer *storage_buffers[] = {
             gfx->gpu_trails.buffer,
-            gfx->gpu_offsets.buffer,
             gfx->gpu_colors.buffer,
             gfx->gpu_masses.buffer,
             gfx->gpu_movables.buffer,
         };
 
-        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 5);
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, sizeof(storage_buffers) / sizeof(SDL_GPUBuffer*));
 
         SDL_BindGPUGraphicsPipeline(render_pass, gfx->circle_pipeline);
         SDL_DrawGPUPrimitives(
@@ -254,9 +246,7 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
     SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
-void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu) {
-    arrfree(gfx->offsets);
-
+void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu) {
     SDL_ReleaseGPUGraphicsPipeline(gpu, gfx->circle_pipeline);
     SDL_ReleaseGPUGraphicsPipeline(gpu, gfx->trail_pipeline);
     SDL_ReleaseGPUGraphicsPipeline(gpu, gfx->ghost_pipeline);
@@ -264,6 +254,5 @@ void graphics_free(Graphics *gfx, SDL_GPUDevice *gpu) {
     SDL_ReleaseGPUBuffer(gpu, gfx->gpu_masses.buffer);
     SDL_ReleaseGPUBuffer(gpu, gfx->gpu_colors.buffer);
     SDL_ReleaseGPUBuffer(gpu, gfx->gpu_trails.buffer);
-    SDL_ReleaseGPUBuffer(gpu, gfx->gpu_offsets.buffer);
     SDL_ReleaseGPUBuffer(gpu, gfx->gpu_movables.buffer);
 }

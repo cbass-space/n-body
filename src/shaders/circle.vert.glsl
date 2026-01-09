@@ -10,10 +10,9 @@ layout (location = 0) out VertexOut frag;
 
 const uint TRAIL_LENGTH = 256;
 layout (std430, set = 0, binding = 0) readonly buffer PositionStorage { vec2 positions[][TRAIL_LENGTH]; };
-layout (std430, set = 0, binding = 1) readonly buffer OffsetStorage { uint offsets[]; };
-layout (std430, set = 0, binding = 2) readonly buffer ColorStorage { vec4 colors[]; };
-layout (std430, set = 0, binding = 3) readonly buffer MassStorage { float masses[]; };
-layout (std430, set = 0, binding = 4) readonly buffer MovableStorage { float movable[]; };
+layout (std430, set = 0, binding = 1) readonly buffer ColorStorage { vec4 colors[]; };
+layout (std430, set = 0, binding = 2) readonly buffer MassStorage { float masses[]; };
+layout (std430, set = 0, binding = 3) readonly buffer MovableStorage { float movable[]; };
 
 layout (std140, set = 1, binding = 0) uniform TransformUniform {
     mat4 orthographic;
@@ -39,7 +38,6 @@ void main() {
     frag.outline = movable[gl_InstanceIndex] == 1.0 ? movable_outline : static_outline;
 
     float radius = compute_radius(masses[gl_InstanceIndex]);
-    uint current = (counter - offsets[gl_InstanceIndex]) % TRAIL_LENGTH;
-    vec2 position = positions[gl_InstanceIndex][current];
+    vec2 position = positions[gl_InstanceIndex][counter];
     gl_Position = orthographic * view * vec4(radius * frag.position + position, 0.0, 1.0);
 }
