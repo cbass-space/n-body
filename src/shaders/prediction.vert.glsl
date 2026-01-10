@@ -2,8 +2,8 @@
 
 layout (location = 0) out vec4 out_color;
 
-const uint TRAIL_LENGTH = 512;
-layout (std430, set = 0, binding = 0) readonly buffer PositionStorage { vec2 positions[][TRAIL_LENGTH]; };
+const uint PREDICTION_LENGTH = 2048;
+layout (std430, set = 0, binding = 0) readonly buffer PositionStorage { vec2 positions[][PREDICTION_LENGTH]; };
 layout (std430, set = 0, binding = 1) readonly buffer ColorStorage { vec4 colors[]; };
 
 layout (std140, set = 1, binding = 0) uniform TransformUniform {
@@ -12,21 +12,21 @@ layout (std140, set = 1, binding = 0) uniform TransformUniform {
 };
 
 layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
-    vec3 _padding;
-    uint current;
+    vec4 _padding;
     float brightness;
     uint target;
 };
 
 void main() {
-    vec2 position = positions[gl_InstanceIndex][(current - gl_VertexIndex) % TRAIL_LENGTH];
+    vec2 position = positions[gl_InstanceIndex][gl_VertexIndex];
     if (target != uint(-1)) {
-        position += positions[target][current]
-            - positions[target][(current - gl_VertexIndex) % TRAIL_LENGTH];
+        position += positions[target][0]
+            - positions[target][gl_VertexIndex];
     }
 
     gl_Position = orthographic * view * vec4(position, 0.0, 1.0);
 
-    float alpha = brightness * (1.0 - float(gl_VertexIndex) / float(TRAIL_LENGTH));
+    float alpha = (brightness / 3.0) * (1.0 - float(gl_VertexIndex) / float(PREDICTION_LENGTH));
     out_color = vec4(colors[gl_InstanceIndex].rgb, alpha);
 }
+

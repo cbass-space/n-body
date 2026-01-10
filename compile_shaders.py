@@ -21,7 +21,7 @@ def main():
     out_dir = Path(sys.argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    glsl_files = list(in_dir.glob("*.glsl"))
+    glsl_files = list(in_dir.rglob("*.glsl"))
     if not glsl_files:
         print(f"Warning! no shader files found in {in_dir}")
         sys.exit(0)

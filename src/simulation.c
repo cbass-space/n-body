@@ -205,6 +205,20 @@ f32 body_radius(const Simulation *sim, const f32 mass) {
     return powf(mass / sim->options.density, 1.0f/3.0f);
 }
 
+void simulation_copy(Simulation *source, Simulation *destination) {
+    *destination = (Simulation) { 0 };
+    destination->options = source->options;
+
+    arrsetcap(destination->r, arrlenu(source->r));
+    arrsetcap(destination->v, arrlenu(source->v));
+    arrsetcap(destination->m, arrlenu(source->m));
+    arrsetcap(destination->movable, arrlenu(source->movable));
+    for (usize i = 0; i < arrlenu(source->r); i++) arrput(destination->r, source->r[i]);
+    for (usize i = 0; i < arrlenu(source->m); i++) arrput(destination->m, source->m[i]);
+    for (usize i = 0; i < arrlenu(source->v); i++) arrput(destination->v, source->v[i]);
+    for (usize i = 0; i < arrlenu(source->movable); i++) arrput(destination->movable, source->movable[i]);
+}
+
 void simulation_free(Simulation *sim) {
     arrfree(sim->r);
     arrfree(sim->v);

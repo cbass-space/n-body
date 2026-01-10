@@ -8,7 +8,7 @@ struct VertexOut {
 
 layout (location = 0) out VertexOut frag;
 
-const uint TRAIL_LENGTH = 256;
+const uint TRAIL_LENGTH = 512;
 layout (std430, set = 0, binding = 0) readonly buffer PositionStorage { vec2 positions[][TRAIL_LENGTH]; };
 layout (std430, set = 0, binding = 1) readonly buffer ColorStorage { vec4 colors[]; };
 layout (std430, set = 0, binding = 2) readonly buffer MassStorage { float masses[]; };
@@ -23,7 +23,7 @@ layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
     float density;
     float movable_outline;
     float static_outline;
-    uint counter;
+    uint current;
     vec2 _padding;
 };
 
@@ -38,6 +38,6 @@ void main() {
     frag.outline = movable[gl_InstanceIndex] == 1.0 ? movable_outline : static_outline;
 
     float radius = compute_radius(masses[gl_InstanceIndex]);
-    vec2 position = positions[gl_InstanceIndex][counter];
+    vec2 position = positions[gl_InstanceIndex][current];
     gl_Position = orthographic * view * vec4(radius * frag.position + position, 0.0, 1.0);
 }

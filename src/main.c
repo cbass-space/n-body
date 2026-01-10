@@ -1,4 +1,3 @@
-// based on https://github.com/dearimgui/dear_bindings/tree/main/examples/example_sdl3_sdlgpu3
 #include <stdio.h>
 
 #define SDL_MAIN_USE_CALLBACKS
@@ -48,16 +47,17 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
 SDL_AppResult SDL_AppIterate(void *appstate) {
     Application *app = appstate;
     static u64 last_tick = 0;
-    static f64 accumulator = 0.0;
+    static f32 accumulator = 0.0;
 
     if (last_tick == 0) last_tick = SDL_GetTicksNS();
     const u64 current_tick = SDL_GetTicksNS();
-    const f64 delta_time = (f64)(current_tick - last_tick) / (f64) SDL_NS_PER_SECOND;
+    const f32 delta_time = (f32)(current_tick - last_tick) / (f32) SDL_NS_PER_SECOND;
     last_tick = current_tick;
 
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
         if (!app->options.paused) simulation_update(&app->sim, app->options.fixed_delta_time);
+        prediction_update(&app->predictions, &app->sim, &app->ghost, app->options.fixed_delta_time);
         camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
     }
@@ -76,8 +76,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .gpu = app->gpu,
         .window = app->window,
         .sim = &app->sim,
+        .cam = &app->cam,
         .ghost = &app->ghost,
-        .cam = &app->cam
+        .predictions = &app->predictions
     });
 
     return SDL_APP_CONTINUE;
@@ -111,6 +112,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     if (!app->gui.io->WantCaptureKeyboard) {
         camera_keyboard(&app->cam, event, &app->sim);
         ghost_keyboard(&app->ghost, event);
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_SPACE) app->options.paused = !app->options.paused;
     }
 
     return SDL_APP_CONTINUE;

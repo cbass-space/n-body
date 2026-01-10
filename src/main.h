@@ -16,7 +16,6 @@
 #define WIDTH_DEFAULT 1200
 #define HEIGHT_DEFAULT 900
 #define FIXED_DELTA_TIME_DEFAULT 0.01f
-#define TRAIL_LENGTH 256
 #define EPSILON 1e-6f
 
 // new body defaults
@@ -36,9 +35,11 @@
 #define FIELD_GRID_DEFAULT 100.0f
 #define MOVABLE_OUTLINE_DEFAULT 0.1f
 #define STATIC_OUTLINE_DEFAULT 1.0f
-#define PREDICT_LENGTH_DEFAULT 4096
-#define PREDICT_LENGTH_MAX 8192
 #define TRAIL_FADE_DEFAULT 1.0f
+
+// fixed (change is shaders as well)
+#define TRAIL_LENGTH 512
+#define PREDICTIONS_LENGTH 2048
 
 // SIMULATION //
 
@@ -82,6 +83,7 @@ typedef struct {
 
 usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body);
 void simulation_update(Simulation *sim, f64 dt);
+void simulation_copy(Simulation *source, Simulation *destination);
 void simulation_free(Simulation *sim);
 f32 body_radius(const Simulation *sim, f32 mass);
 
@@ -117,6 +119,16 @@ void ghost_update(Ghost *ghost, SDL_Window *window, const Simulation *sim, const
 bool ghost_mouse(Ghost *ghost, const SDL_Event *event);
 void ghost_keyboard(Ghost *ghost, const SDL_Event *event);
 
+// PREDICTIONS //
+
+typedef struct {
+    HMM_Vec2 *positions;
+    HMM_Vec2 *ghost_positions;
+} Predictions;
+
+void prediction_update(Predictions *predictions, Simulation *sim, const Ghost *ghost, f32 delta_time);
+void prediction_free(Predictions *predictions);
+
 // GRAPHICS //
 
 typedef struct {
@@ -148,14 +160,19 @@ typedef struct {
     u32 trail_counter;
     SDL_FColor *colors;
 
-    SDL_GPUGraphicsPipeline *circle_pipeline;
-    SDL_GPUGraphicsPipeline *trail_pipeline;
-    SDL_GPUGraphicsPipeline *ghost_pipeline;
+    SDL_GPUGraphicsPipeline *gpu_circle_pipeline;
+    SDL_GPUGraphicsPipeline *gpu_trail_pipeline;
+    SDL_GPUGraphicsPipeline *gpu_prediction_pipeline;
+    SDL_GPUGraphicsPipeline *gpu_ghost_circle_pipeline;
+    SDL_GPUGraphicsPipeline *gpu_ghost_prediction_pipeline;
 
     GPUArray gpu_trails;
+    GPUArray gpu_predictions;
     GPUArray gpu_masses;
     GPUArray gpu_movables;
     GPUArray gpu_colors;
+
+    SDL_GPUBuffer *gpu_ghost_predictions;
 } Graphics;
 
 i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window);
@@ -170,8 +187,9 @@ typedef struct {
     SDL_GPUDevice *gpu;
     SDL_Window *window;
     const Simulation *sim;
-    const Ghost *ghost;
     const Camera *cam;
+    const Ghost *ghost;
+    const Predictions *predictions;
 } GraphicsDrawInfo;
 void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info);
 void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu);
@@ -206,8 +224,9 @@ typedef struct {
     SDL_Window *window;
     SDL_GPUDevice *gpu;
     Simulation sim;
-    Ghost ghost;
     Camera cam;
+    Ghost ghost;
+    Predictions predictions;
     Graphics gfx;
     Gui gui;
 } Application;
