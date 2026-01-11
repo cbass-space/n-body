@@ -1,4 +1,6 @@
-#include "main.h"
+#include "camera.h"
+#include "simulation.h"
+
 #include "stb_ds.h"
 
 void camera_init(Camera *cam) {

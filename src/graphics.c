@@ -1,9 +1,15 @@
-#include "SDL3/SDL_gpu.h"
+#include "graphics.h"
+#include "constants.h"
+#include "simulation.h"
+#include "camera.h"
+#include "ghost.h"
+#include "prediction.h"
+
 #include "stb_ds.h"
+#include "SDL3/SDL_gpu.h"
+#include "sdl_utils.h"
 #include "dcimgui.h"
 #include "backends/dcimgui_impl_sdlgpu3.h"
-
-#include "main.h"
 
 #define TRAIL_SIZE sizeof(HMM_Vec2) * TRAIL_LENGTH
 #define PREDICTION_SIZE sizeof(HMM_Vec2) * PREDICTIONS_LENGTH

@@ -13,17 +13,24 @@ endif()
 
 # n-body
 add_executable(${PROJECT_NAME} WIN32
-    src/main.h
     src/main.c
     src/simulation.c
-    src/gui.c
-    src/graphics.c
     src/camera.c
     src/ghost.c
     src/prediction.c
+    src/graphics.c
+    src/gui.c
+
+    include/constants.h
+    include/simulation.h
+    include/camera.h
+    include/ghost.h
+    include/prediction.h
+    include/graphics.h
+    include/gui.h
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE lib)
+target_include_directories(${PROJECT_NAME} PRIVATE lib include)
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 
 target_compile_options(${PROJECT_NAME} PRIVATE

@@ -1,7 +1,11 @@
-#include "main.h"
+#include "prediction.h"
+#include "constants.h"
+#include "simulation.h"
+#include "ghost.h"
+
 #include "stb_ds.h"
 
-void prediction_update(Predictions *predictions, Simulation *sim, const Ghost *ghost, const f32 delta_time) {
+void prediction_update(Predictions *predictions, const Simulation *sim, const Ghost *ghost, const f32 delta_time) {
     Simulation sim_copy = { 0 };
     simulation_copy(sim, &sim_copy);
     if (ghost->mode) simulation_add_body(&sim_copy, &(SimulationAddBodyInfo) {

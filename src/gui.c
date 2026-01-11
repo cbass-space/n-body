@@ -1,9 +1,14 @@
+#include "gui.h"
+#include "simulation.h"
+#include "camera.h"
+#include "ghost.h"
+#include "graphics.h"
+
 #include "stb_ds.h"
 #include "dcimgui.h"
 #include "backends/dcimgui_impl_sdl3.h"
 #include "backends/dcimgui_impl_sdlgpu3.h"
-
-#include "main.h"
+#include "types.h"
 
 i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
     CIMGUI_CHECKVERSION();

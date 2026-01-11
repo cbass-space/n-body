@@ -1,6 +1,7 @@
 #ifndef INT_TYPES
 #define INT_TYPES
 
+#include <stdio.h>
 #include <stdint.h>
 
 typedef float     f32;

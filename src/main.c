@@ -1,12 +1,30 @@
-#include <stdio.h>
+#include "constants.h"
+#include "simulation.h"
+#include "camera.h"
+#include "ghost.h"
+#include "prediction.h"
+#include "graphics.h"
+#include "gui.h"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
+#include "SDL3/SDL_gpu.h"
+#include "types.h"
+
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
-#define SDL_UTILS_IMPLEMENTATION
-#include "main.h"
+typedef struct {
+    ApplicationOptions options;
+    SDL_Window *window;
+    SDL_GPUDevice *gpu;
+    Simulation sim;
+    Camera cam;
+    Ghost ghost;
+    Predictions predictions;
+    Graphics gfx;
+    Gui gui;
+} Application;
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     Application *app = SDL_calloc(1, sizeof(*app));
@@ -125,6 +143,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_ReleaseWindowFromGPUDevice(app->gpu, app->window);
 
     simulation_free(&app->sim);
+    prediction_free(&app->predictions);
     graphics_free(&app->gfx, app->gpu);
     gui_free();
 
@@ -133,7 +152,3 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_Quit();
 }
 
-SDL_AppResult panic(const char *location, const char *message) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s: %s\n", location, message);
-    return SDL_APP_FAILURE;
-}

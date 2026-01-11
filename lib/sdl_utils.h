@@ -5,7 +5,7 @@
 #include "SDL3/SDL_gpu.h"
 #include "SDL3_shadercross/SDL_shadercross.h"
 
-SDL_GPUColorTargetBlendState BLEND_STATE;
+static SDL_GPUColorTargetBlendState BLEND_STATE;
 
 typedef struct {
     SDL_Window *window;
@@ -13,8 +13,8 @@ typedef struct {
     const char *fragment_shader_path;
     SDL_GPUPrimitiveType primitive_type;
 } CreateGPUGraphicsPipelineInfo;
-SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info);
-SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path);
+static SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info);
+static SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path);
 
 typedef struct {
     SDL_GPUBuffer *buffer;
@@ -23,15 +23,15 @@ typedef struct {
     u32 source_offset;
     u32 buffer_offset;
 } UploadGPUBufferBinding;
-void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const UploadGPUBufferBinding *bindings, usize num_bindings);
+static void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const UploadGPUBufferBinding *bindings, usize num_bindings);
 
 typedef struct {
     SDL_GPUBuffer *buffer;
     SDL_GPUBufferCreateInfo info;
     u32 used;
 } GPUArray;
-GPUArray CreateGPUArray(SDL_GPUDevice *gpu, u32 size);
-void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, u32 size);
+static GPUArray CreateGPUArray(SDL_GPUDevice *gpu, u32 size);
+static void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, u32 size);
 
 typedef struct {
     GPUArray *array;
@@ -39,14 +39,11 @@ typedef struct {
     u32 size;
     u32 source_offset;
 } AppendGPUArrayBinding;
-void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const AppendGPUArrayBinding *bindings, usize num_bindings);
+static void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const AppendGPUArrayBinding *bindings, usize num_bindings);
 
-#endif
+static SDL_AppResult panic(const char *location, const char *message);
 
-// #define SDL_UTILS_IMPLEMENTATION
-#ifdef SDL_UTILS_IMPLEMENTATION
-
-SDL_GPUColorTargetBlendState BLEND_STATE = {
+static SDL_GPUColorTargetBlendState BLEND_STATE = {
     .enable_blend = true,
     .color_blend_op = SDL_GPU_BLENDOP_ADD,
     .alpha_blend_op = SDL_GPU_BLENDOP_ADD,
@@ -56,7 +53,7 @@ SDL_GPUColorTargetBlendState BLEND_STATE = {
     .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA
 };
 
-SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info) {
+static SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const CreateGPUGraphicsPipelineInfo *info) {
     SDL_GPUShader *vertex_shader = LoadSPIRVShader(gpu, info->vertex_shader_path);
     SDL_GPUShader *fragment_shader = LoadSPIRVShader(gpu, info->fragment_shader_path);
     SDL_GPUGraphicsPipeline *pipeline = SDL_CreateGPUGraphicsPipeline(gpu, &(SDL_GPUGraphicsPipelineCreateInfo) {
@@ -77,7 +74,7 @@ SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *gpu, const Cre
     return pipeline;
 }
 
-SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path) {
+static SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path) {
     SDL_ShaderCross_ShaderStage stage;
     if (SDL_strstr(shader_path, ".vert")) stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
     else if (SDL_strstr(shader_path, ".frag")) stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
@@ -102,7 +99,7 @@ SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *shader_path) {
     }, &metadata->resource_info, 0);
 }
 
-void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const UploadGPUBufferBinding *bindings, const usize num_bindings) {
+static void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const UploadGPUBufferBinding *bindings, const usize num_bindings) {
     if (num_bindings == 0) return;
     u32 total_size = 0;
     for (usize i = 0; i < num_bindings; i++) {
@@ -138,7 +135,7 @@ void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const 
     SDL_ReleaseGPUTransferBuffer(gpu, transfer_buffer);
 }
 
-GPUArray CreateGPUArray(SDL_GPUDevice *gpu, const u32 size) {
+static GPUArray CreateGPUArray(SDL_GPUDevice *gpu, const u32 size) {
     const SDL_GPUBufferCreateInfo info = {
         .size = size,
         .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ
@@ -151,7 +148,7 @@ GPUArray CreateGPUArray(SDL_GPUDevice *gpu, const u32 size) {
     };
 }
 
-void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const u32 size) {
+static void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const u32 size) {
     if ((array->used + size) <= array->info.size) return;
 
     SDL_GPUBuffer *old_buffer = array->buffer;
@@ -170,7 +167,7 @@ void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_p
     SDL_ReleaseGPUBuffer(gpu, old_buffer);
 }
 
-void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const AppendGPUArrayBinding *bindings, const usize num_bindings) {
+static void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const AppendGPUArrayBinding *bindings, const usize num_bindings) {
     UploadGPUBufferBinding *upload_bindings = SDL_malloc(sizeof(UploadGPUBufferBinding) * num_bindings);
     for (usize i = 0; i < num_bindings; i++) {
         ExpandGPUArray(bindings[i].array, gpu, copy_pass, bindings[i].size);
@@ -187,6 +184,11 @@ void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const Appen
 
     UploadIntoGPUBuffers(gpu, copy_pass, upload_bindings, num_bindings);
     SDL_free(upload_bindings);
+}
+
+static SDL_AppResult panic(const char *location, const char *message) {
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s: %s\n", location, message);
+    return SDL_APP_FAILURE;
 }
 
 #endif

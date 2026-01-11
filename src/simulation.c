@@ -1,6 +1,7 @@
-#include "stb_ds.h"
+#include "simulation.h"
+#include "constants.h"
 
-#include "main.h"
+#include "stb_ds.h"
 
 void simulation_init(Simulation *sim) {
     sim->options = (SimulationOptions) {
@@ -205,7 +206,7 @@ f32 body_radius(const Simulation *sim, const f32 mass) {
     return powf(mass / sim->options.density, 1.0f/3.0f);
 }
 
-void simulation_copy(Simulation *source, Simulation *destination) {
+void simulation_copy(const Simulation *source, Simulation *destination) {
     *destination = (Simulation) { 0 };
     destination->options = source->options;
 

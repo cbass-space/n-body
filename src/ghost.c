@@ -1,4 +1,7 @@
-#include "main.h"
+#include "ghost.h"
+#include "constants.h"
+#include "simulation.h"
+#include "camera.h"
 
 void ghost_init(Ghost *ghost) {
     *ghost = (Ghost) {
