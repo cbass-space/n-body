@@ -2,6 +2,7 @@
 #include "simulation.h"
 #include "camera.h"
 #include "ghost.h"
+#include "prediction.h"
 #include "graphics.h"
 
 #include "stb_ds.h"
@@ -97,11 +98,11 @@ void gui_update(const GuiUpdateInfo *info) {
 
     if (ImGui_CollapsingHeader("Controls and Options", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui_SeparatorText("Controls");
-        ImGui_Checkbox("Pause Simulation", &info->app->paused);
+        ImGui_Checkbox("Pause Simulation", &info->sim->options.paused);
         ImGui_Button("Reset Simulation");
-        SimulationOptions *sim = &info->sim->options;
 
         ImGui_SeparatorText("Simulation Options");
+        SimulationOptions *sim = &info->sim->options;
         ImGui_DragFloat("Time Step", &info->app->fixed_delta_time);
         ImGui_DragFloat("Gravity Coefficient", &sim->gravity);
         HelpMarker("Strength of the gravitational force between two bodies.");
@@ -120,16 +121,9 @@ void gui_update(const GuiUpdateInfo *info) {
             ImGui_SliderFloat("Restitution Coefficient", &cor, 0.0f, 1.0f);
             HelpMarker("A coefficient of 0.0 leads to a perfectly inelastic collision, while a coefficient of 1.0 is a perfectly elastic collision.");
         }
-        ImGui_Checkbox("Use Barnes-Hut Optimization", &sim->barnes_hut);
-        HelpMarker("Whether to use a quadtree to calculate the gravitational force on a body (more performant) or calculate the force directly (more accurate).");
-        if (sim->barnes_hut) {
-            static bool draw = false;
-            static u8 max_leaves = 1;
-            ImGui_SeparatorText("Barnes-Hut Parameters");
-            ImGui_Checkbox("Draw quadtree", &draw);
-            ImGui_SliderInt("Bodies per Leaf Node", (i32*) &max_leaves, 1, 256);
-            HelpMarker("The maximum number of bodies per leaf node of the quadtree.");
-        }
+
+        ImGui_Checkbox("Predict Body Motion", &info->predictions->enabled);
+        HelpMarker("Simulate planets into the future and draw their trajectories (expensive compute!)");
 
         ImGui_SeparatorText("Drawing Options");
         ImGui_ColorEdit3("Space Color", (f32*) &info->gfx->options.clear_color, 0);

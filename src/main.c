@@ -29,11 +29,7 @@ typedef struct {
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     Application *app = SDL_calloc(1, sizeof(*app));
     *appstate = app;
-
-    app->options = (ApplicationOptions) {
-        .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT,
-        .paused = false,
-    };
+    app->options = (ApplicationOptions) { .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT };
 
     // initialize SDL3
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return panic("SDL_Init() in app_init()", SDL_GetError());
@@ -53,9 +49,10 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     SDL_SetGPUSwapchainParameters(app->gpu, app->window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
 
     // initialize modules
-    camera_init(&app->cam);
     simulation_init(&app->sim);
+    camera_init(&app->cam);
     ghost_init(&app->ghost);
+    prediction_init(&app->predictions);
     if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return panic("graphics_init() in app_init()", "Failed to initialize graphics!");
     if (gui_init(&app->gui, app->window, app->gpu) != 0) return panic("gui_init() in app_init()", "Failed to initialize GUI!");
 
@@ -74,7 +71,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
-        if (!app->options.paused) simulation_update(&app->sim, app->options.fixed_delta_time);
+        simulation_update(&app->sim, app->options.fixed_delta_time);
         prediction_update(&app->predictions, &app->sim, &app->ghost, app->options.fixed_delta_time);
         camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
@@ -86,8 +83,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .app = &app->options,
         .sim = &app->sim,
         .cam = &app->cam,
+        .ghost = &app->ghost,
+        .predictions = &app->predictions,
         .gfx = &app->gfx,
-        .ghost = &app->ghost
     });
 
     graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
@@ -130,7 +128,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     if (!app->gui.io->WantCaptureKeyboard) {
         camera_keyboard(&app->cam, event, &app->sim);
         ghost_keyboard(&app->ghost, event);
-        if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_SPACE) app->options.paused = !app->options.paused;
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_SPACE) app->sim.options.paused = !app->sim.options.paused;
     }
 
     return SDL_APP_CONTINUE;

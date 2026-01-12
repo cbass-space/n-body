@@ -5,9 +5,16 @@
 
 #include "stb_ds.h"
 
+void prediction_init(Predictions *predictions) {
+    predictions->enabled = true;
+}
+
 void prediction_update(Predictions *predictions, const Simulation *sim, const Ghost *ghost, const f32 delta_time) {
+    if (!predictions->enabled) return;
+
     Simulation sim_copy = { 0 };
     simulation_copy(sim, &sim_copy);
+    sim_copy.options.paused = false;
     if (ghost->mode) simulation_add_body(&sim_copy, &(SimulationAddBodyInfo) {
         .position = ghost->position,
         .velocity = ghost->velocity,

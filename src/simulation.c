@@ -10,7 +10,7 @@ void simulation_init(Simulation *sim) {
         .density = DENSITY_DEFAULT,
         .integrator = INTEGRATOR_DEFAULT,
         .collisions = COLLISIONS_DEFAULT,
-        .barnes_hut = BARNES_HUT_DEFAULT
+        .paused = false
     };
 }
 
@@ -28,6 +28,8 @@ static void integrate_verlet(const Simulation *sim, usize i, f32 dt);
 static void integrate_rk4(Simulation *sim, usize i, f32 dt);
 static void collide_bodies(const Simulation *sim);
 void simulation_update(Simulation *sim, const f64 dt) {
+    if (sim->options.paused) return;
+
     for (usize i = 0; i < arrlenu(sim->r); i++) {
         if (!sim->movable[i]) {
             sim->v[i] = (HMM_Vec2) { .X = 0.0f, .Y = 0.0f };

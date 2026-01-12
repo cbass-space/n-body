@@ -172,7 +172,7 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
         (HMM_Vec3) { .X = 0.0f, .Y = 1.0f, .Z = 0.0f }
     );
 
-    gfx->trail_counter = (gfx->trail_counter + 1) % TRAIL_LENGTH;
+    if (!info->sim->options.paused) gfx->trail_counter = (gfx->trail_counter + 1) % TRAIL_LENGTH;
     const u32 camera_target = info->cam->target == (usize) -1 ? (u32) -1 : info->cam->target;
     const HMM_Mat4 matrices[] = { orthographic, view };
     const struct {
@@ -196,17 +196,20 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
 
     u32 num_bindings = 0;
     UploadGPUBufferBinding *bindings = SDL_malloc((arrlenu(gfx->colors) + 2) * sizeof(UploadGPUBufferBinding));
-    for (usize i = 0; i < arrlenu(gfx->colors); i++) {
-        bindings[num_bindings] = (UploadGPUBufferBinding) {
-            .buffer = gfx->gpu_trails.buffer,
-            .source = (u8*) &info->sim->r[i],
-            .size = sizeof(HMM_Vec2),
-            .buffer_offset = (i * TRAIL_SIZE + gfx->trail_counter * sizeof(HMM_Vec2)),
-        };
-        num_bindings++;
+
+    if (!info->sim->options.paused) {
+        for (usize i = 0; i < arrlenu(gfx->colors); i++) {
+            bindings[num_bindings] = (UploadGPUBufferBinding) {
+                .buffer = gfx->gpu_trails.buffer,
+                .source = (u8*) &info->sim->r[i],
+                .size = sizeof(HMM_Vec2),
+                .buffer_offset = (i * TRAIL_SIZE + gfx->trail_counter * sizeof(HMM_Vec2)),
+            };
+            num_bindings++;
+        }
     }
 
-    if (arrlen(info->predictions->positions)) {
+    if (arrlen(info->predictions->positions) && info->predictions->enabled) {
         bindings[num_bindings] = (UploadGPUBufferBinding) {
             .buffer = gfx->gpu_predictions.buffer,
             .source = (u8*) info->predictions->positions,
@@ -215,7 +218,7 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
         num_bindings++;
     }
 
-    if (info->ghost->mode) {
+    if (info->ghost->mode && info->predictions->enabled) {
         bindings[num_bindings]  = (UploadGPUBufferBinding) {
             .buffer = gfx->gpu_ghost_predictions,
             .source = (u8*) info->predictions->ghost_positions,
@@ -260,13 +263,15 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
             0, 0
         );
 
-        SDL_BindGPUVertexStorageBuffers(render_pass, 0, &gfx->gpu_predictions.buffer, 1);
-        SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_prediction_pipeline);
-        SDL_DrawGPUPrimitives(
-            render_pass,
-            PREDICTIONS_LENGTH, arrlenu(gfx->colors),
-            0, 0
-        );
+        if (info->predictions->enabled) {
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &gfx->gpu_predictions.buffer, 1);
+            SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_prediction_pipeline);
+            SDL_DrawGPUPrimitives(
+                render_pass,
+                PREDICTIONS_LENGTH, arrlenu(gfx->colors),
+                0, 0
+            );
+        }
     }
 
     if (info->ghost->mode) {
@@ -291,14 +296,16 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
             0, 0
         );
 
-        SDL_GPUBuffer *ghost_buffers[] = { gfx->gpu_predictions.buffer, gfx->gpu_ghost_predictions };
-        SDL_BindGPUVertexStorageBuffers(render_pass, 0, ghost_buffers, sizeof(ghost_buffers) / sizeof(SDL_GPUBuffer*));
-        SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_ghost_prediction_pipeline);
-        SDL_DrawGPUPrimitives(
-            render_pass,
-            PREDICTIONS_LENGTH, 1,
-            0, 0
-        );
+        if (info->predictions->enabled) {
+            SDL_GPUBuffer *ghost_buffers[] = { gfx->gpu_predictions.buffer, gfx->gpu_ghost_predictions };
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, ghost_buffers, sizeof(ghost_buffers) / sizeof(SDL_GPUBuffer*));
+            SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_ghost_prediction_pipeline);
+            SDL_DrawGPUPrimitives(
+                render_pass,
+                PREDICTIONS_LENGTH, 1,
+                0, 0
+            );
+        }
     }
 
     SDL_EndGPURenderPass(render_pass);

@@ -4,6 +4,7 @@
 typedef struct Simulation Simulation;
 typedef struct Camera Camera;
 typedef struct Ghost Ghost;
+typedef struct Predictions Predictions;
 typedef struct Graphics Graphics;
 
 #include "SDL3/SDL.h"
@@ -13,7 +14,6 @@ typedef struct Graphics Graphics;
 
 typedef struct {
     f32 fixed_delta_time;
-    bool paused;
 } ApplicationOptions;
 
 typedef struct {
@@ -26,6 +26,7 @@ typedef struct {
     Simulation *sim;
     Camera *cam;
     Ghost *ghost;
+    Predictions *predictions;
     Graphics *gfx;
 } GuiUpdateInfo;
 void gui_update(const GuiUpdateInfo *info);

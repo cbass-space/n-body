@@ -19,7 +19,7 @@ typedef struct {
     f32 gravity;
     f32 softening;
     f32 density;
-    bool barnes_hut;
+    bool paused;
 } SimulationOptions;
 
 // not sure about this chief
