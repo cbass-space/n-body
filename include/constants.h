@@ -5,7 +5,9 @@
 #define WIDTH_DEFAULT 1200
 #define HEIGHT_DEFAULT 900
 #define FIXED_DELTA_TIME_DEFAULT 0.01f
+#define PREDICTION_DELTA_TIME_MULTIPLIER 2
 #define EPSILON 1e-6f
+#define MAX_ACCUMULATOR_TIME 0.25
 
 // new body defaults
 #define MASS_DEFAULT 50.0f
@@ -30,3 +32,4 @@
 #define PREDICTIONS_LENGTH 2048
 
 #endif
+

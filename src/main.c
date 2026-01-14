@@ -14,6 +14,8 @@
 #define STB_DS_IMPLEMENTATION
 #include "stb_ds.h"
 
+#define UNUSED(x) (void)(x)
+
 typedef struct {
     ApplicationOptions options;
     SDL_Window *window;
@@ -27,6 +29,8 @@ typedef struct {
 } Application;
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
+    UNUSED(argc); UNUSED(argv);
+
     Application *app = SDL_calloc(1, sizeof(*app));
     *appstate = app;
     app->options = (ApplicationOptions) { .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT };
@@ -72,7 +76,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
         simulation_update(&app->sim, app->options.fixed_delta_time);
-        prediction_update(&app->predictions, &app->sim, &app->ghost, app->options.fixed_delta_time);
+        prediction_update(&app->predictions, &app->sim, &app->ghost, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
         camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
     }
@@ -135,6 +139,8 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+    UNUSED(result);
+
     Application *app = appstate;
 
     SDL_WaitForGPUIdle(app->gpu);
@@ -149,4 +155,3 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_DestroyGPUDevice(app->gpu);
     SDL_Quit();
 }
-
