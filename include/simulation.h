@@ -11,32 +11,23 @@ typedef struct {
         INTEGRATOR_VERLET,
         INTEGRATOR_RK4,
     } integrator;
-    enum {
-        COLLISIONS_NONE,
-        COLLISIONS_MERGE,
-        COLLISIONS_BOUNCE
-    } collisions;
     f32 gravity;
     f32 softening;
     f32 density;
+    bool collide;
     bool paused;
 } SimulationOptions;
 
-// not sure about this chief
 typedef struct Simulation {
     SimulationOptions options;
-    // body positions
-    HMM_Vec2 *r;
-    // body velocities
-    HMM_Vec2 *v;
-    // body masses
-    f32 *m;
-    // whether to simulate or remain static
+    HMM_Vec2 *positions;
+    HMM_Vec2 *velocities;
+    f32 *masses;
     bool *movable;
+    u32 body_count;
 } Simulation;
 
 void simulation_init(Simulation *sim);
-
 typedef struct {
     HMM_Vec2 position;
     HMM_Vec2 velocity;

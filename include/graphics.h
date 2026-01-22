@@ -38,6 +38,7 @@ typedef struct Graphics {
     GraphicsDirtyFlag dirty_flag;
 
     u32 trail_counter;
+    u32 body_count;
     SDL_FColor *colors;
 
     SDL_GPUGraphicsPipeline *gpu_circle_pipeline;

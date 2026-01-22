@@ -111,7 +111,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     gui_event(event);
 
     if (!app->gui.io->WantCaptureMouse) {
-        camera_mouse(&app->cam, event, app->window, app->ghost.mode);
+        camera_mouse(&app->cam, event, app->window, app->ghost.enabled);
         if (ghost_mouse(&app->ghost, event)) {
             const usize index = simulation_add_body(&app->sim, &(SimulationAddBodyInfo) {
                 .position = app->ghost.position,

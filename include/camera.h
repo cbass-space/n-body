@@ -14,7 +14,7 @@ typedef struct Camera {
 } Camera;
 
 void camera_init(Camera *cam);
-void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, bool ghost_mode);
+void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, bool ghost_enabled);
 void camera_keyboard(Camera *cam, const SDL_Event *event, const Simulation *sim);
 void camera_update(Camera *cam, const Simulation *sim);
 HMM_Vec2 screen_to_world(const Camera *cam, SDL_Window *window, HMM_Vec2 position);

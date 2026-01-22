@@ -29,4 +29,3 @@ void main() {
     float alpha = (brightness / 3.0) * (1.0 - float(gl_VertexIndex) / float(PREDICTION_LENGTH));
     out_color = vec4(colors[gl_InstanceIndex].rgb, alpha);
 }
-

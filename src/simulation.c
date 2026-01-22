@@ -9,18 +9,17 @@ void simulation_init(Simulation *sim) {
         .softening = SOFTENING_DEFAULT,
         .density = DENSITY_DEFAULT,
         .integrator = INTEGRATOR_DEFAULT,
-        .collisions = COLLISIONS_DEFAULT,
+        .collide = false,
         .paused = false
     };
 }
 
 usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body) {
-    const usize index = arrlenu(sim->r);
-    arrput(sim->r, body->position);
-    arrput(sim->v, body->velocity);
-    arrput(sim->m, body->mass);
+    arrput(sim->positions, body->position);
+    arrput(sim->velocities, body->velocity);
+    arrput(sim->masses, body->mass);
     arrput(sim->movable, body->movable);
-    return index;
+    return sim->body_count++;
 }
 
 static void integrate_euler(const Simulation *sim, usize i, f32 dt);
@@ -30,9 +29,9 @@ static void collide_bodies(const Simulation *sim);
 void simulation_update(Simulation *sim, const f64 dt) {
     if (sim->options.paused) return;
 
-    for (usize i = 0; i < arrlenu(sim->r); i++) {
+    for (usize i = 0; i < arrlenu(sim->positions); i++) {
         if (!sim->movable[i]) {
-            sim->v[i] = (HMM_Vec2) { .X = 0.0f, .Y = 0.0f };
+            sim->velocities[i] = (HMM_Vec2) { .X = 0.0f, .Y = 0.0f };
             continue;
         }
 
@@ -55,16 +54,16 @@ void simulation_update(Simulation *sim, const f64 dt) {
 static HMM_Vec2 gravitational_acceleration(const Simulation *sim, const HMM_Vec2 position, const usize skip_index) {
     HMM_Vec2 net_acceleration = (HMM_Vec2) { 0 };
 
-    for (usize i = 0; i < arrlenu(sim->r); i++) {
+    for (usize i = 0; i < arrlenu(sim->positions); i++) {
         if (i == skip_index) continue;
 
-        const HMM_Vec2 separation = HMM_SubV2(sim->r[i], position);
+        const HMM_Vec2 separation = HMM_SubV2(sim->positions[i], position);
         const f32 length_squared = HMM_LenSqrV2(separation) + powf(sim->options.softening, 2.0f);
         if (length_squared < EPSILON) { return (HMM_Vec2) { 0 }; }
 
         const HMM_Vec2 acceleration = HMM_MulV2F(
             HMM_NormV2(separation),
-            (sim->options.gravity * sim->m[i]) / length_squared
+            (sim->options.gravity * sim->masses[i]) / length_squared
         );
 
         net_acceleration = HMM_AddV2(net_acceleration, acceleration);
@@ -75,36 +74,36 @@ static HMM_Vec2 gravitational_acceleration(const Simulation *sim, const HMM_Vec2
 
 // https://gafferongames.com/post/integration_basics/#semi-implicit-euler
 static void integrate_euler(const Simulation *sim, const usize i, const f32 dt) {
-    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->r[i], i);
-    sim->v[i] = HMM_AddV2(sim->v[i], HMM_MulV2F(acceleration, dt));
-    sim->r[i] = HMM_AddV2(sim->r[i], HMM_MulV2F(sim->v[i], dt));
+    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->positions[i], i);
+    sim->velocities[i] = HMM_AddV2(sim->velocities[i], HMM_MulV2F(acceleration, dt));
+    sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_MulV2F(sim->velocities[i], dt));
 }
 
 // https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
 static void integrate_verlet(const Simulation *sim, const usize i, const f32 dt) {
-    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->r[i], i);
-    sim->r[i] = HMM_AddV2(sim->r[i], HMM_AddV2(
-        HMM_MulV2F(sim->v[i], dt),
+    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->positions[i], i);
+    sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_AddV2(
+        HMM_MulV2F(sim->velocities[i], dt),
         HMM_MulV2F(acceleration, powf(dt, 2.0f) / 2.0f)
     ));
 
-    const HMM_Vec2 new_acceleration = gravitational_acceleration(sim, sim->r[i], i);
-    sim->v[i] = HMM_AddV2(sim->v[i],
+    const HMM_Vec2 new_acceleration = gravitational_acceleration(sim, sim->positions[i], i);
+    sim->velocities[i] = HMM_AddV2(sim->velocities[i],
         HMM_MulV2F(HMM_AddV2(acceleration, new_acceleration),
         dt / 2.0f)
     );
 }
 
 typedef struct {
-    HMM_Vec2 r;
-    HMM_Vec2 v;
+    HMM_Vec2 position;
+    HMM_Vec2 velocity;
 } KinematicState;
 static KinematicState rk4_add(KinematicState a, KinematicState b);
 static KinematicState rk4_scale(KinematicState state, f32 a);
 static KinematicState rk4_delta(KinematicState state, const Simulation *sim, usize i);
 
 static void integrate_rk4(Simulation *sim, usize i, f32 dt) {
-    KinematicState state = { sim->r[i], sim->v[i] };
+    KinematicState state = { sim->positions[i], sim->velocities[i] };
 
     KinematicState k_1 = rk4_delta(state, sim, i);
     KinematicState k_2 = rk4_delta(rk4_add(state, rk4_scale(k_1, dt / 2.0f)), sim, i);
@@ -119,90 +118,69 @@ static void integrate_rk4(Simulation *sim, usize i, f32 dt) {
     );
 
     KinematicState new_state = rk4_add(state, rk4_scale(k_sum, dt / 6.0f));
-    sim->r[i] = new_state.r;
-    sim->v[i] = new_state.v;
+    sim->positions[i] = new_state.position;
+    sim->velocities[i] = new_state.velocity;
 }
 
 static KinematicState rk4_add(const KinematicState a, const KinematicState b) {
     return (KinematicState) {
-        .r = HMM_AddV2(a.r, b.r),
-        .v = HMM_AddV2(a.v, b.v),
+        .position = HMM_AddV2(a.position, b.position),
+        .velocity = HMM_AddV2(a.velocity, b.velocity),
     };
 }
 
 static KinematicState rk4_scale(const KinematicState state, const f32 a) {
     return (KinematicState) {
-        .r = HMM_MulV2F(state.r, a),
-        .v = HMM_MulV2F(state.v, a),
+        .position = HMM_MulV2F(state.position, a),
+        .velocity = HMM_MulV2F(state.velocity, a),
     };
 }
 
 static KinematicState rk4_delta(const KinematicState state, const Simulation *sim, const usize i) {
     return (KinematicState) {
-        .r = state.v,
-        .v = gravitational_acceleration(sim, state.r, i),
+        .position = state.velocity,
+        .velocity = gravitational_acceleration(sim, state.position, i),
     };
 }
 
-static void collide_elastic(const Simulation *sim, usize i, usize j);
-static void collide_merge(const Simulation *sim, usize i, usize j);
 static void collide_bodies(const Simulation *sim) {
-    if (sim->options.collisions == COLLISIONS_NONE) return;
+    if (!sim->options.collide) return;
 
     // TODO: bucket or quadtree optimization?
-    for (usize i = 0; i < arrlenu(sim->r); i++) {
-        for (usize j = i + 1; j < arrlenu(sim->r); j++) {
-            const f32 R_i = body_radius(sim, sim->m[i]);
-            const f32 R_j = body_radius(sim, sim->m[j]);
+    for (usize i = 0; i < arrlenu(sim->positions); i++) {
+        for (usize j = i + 1; j < arrlenu(sim->positions); j++) {
+            const f32 R_i = body_radius(sim, sim->masses[i]);
+            const f32 R_j = body_radius(sim, sim->masses[j]);
 
-            const HMM_Vec2 delta = HMM_SubV2(sim->r[i], sim->r[j]);
+            const HMM_Vec2 delta = HMM_SubV2(sim->positions[i], sim->positions[j]);
             const f32 distance = HMM_LenV2(delta);
             if (distance > R_i + R_j) continue;
-            const HMM_Vec2 relative_velocity = HMM_SubV2(sim->v[i], sim->v[j]);
+            const HMM_Vec2 relative_velocity = HMM_SubV2(sim->velocities[i], sim->velocities[j]);
             if (HMM_DotV2(delta, relative_velocity) > 0.0) continue;
 
-            if (sim->options.collisions == COLLISIONS_BOUNCE) collide_elastic(sim, i, j);
-            if (sim->options.collisions == COLLISIONS_MERGE) collide_merge(sim, i, j);
+            // TODO: coefficient of restitution?
+            // https://www.youtube.com/watch?v=bSVfItpvG5Q & https://en.wikipedia.org/wiki/Elastic_collision
+            const f32 angle = atan2f(delta.Y, delta.X);
+            HMM_Vec2 i_norm = HMM_RotateV2(sim->velocities[i], -angle);
+            HMM_Vec2 j_norm = HMM_RotateV2(sim->velocities[j], -angle);
+            const f32 i_final = ((sim->masses[i] - sim->masses[j]) / (sim->masses[i] + sim->masses[j])) * i_norm.X + (
+                                    (2 * sim->masses[j]) / (sim->masses[i] + sim->masses[j])) * j_norm.X;
+            const f32 j_final = ((2 * sim->masses[i]) / (sim->masses[i] + sim->masses[j])) * i_norm.X + (
+                                    (sim->masses[j] - sim->masses[i]) / (sim->masses[i] + sim->masses[j])) * j_norm.X;
+            i_norm.X = i_final;
+            j_norm.X = j_final;
+            sim->velocities[i] = HMM_RotateV2(i_norm, angle);
+            sim->velocities[j] = HMM_RotateV2(j_norm, angle);
+            const f32 overlap_distance = R_i + R_j - distance;
+            if (overlap_distance > EPSILON) {
+                const HMM_Vec2 overlap = HMM_MulV2F(HMM_NormV2(delta), R_i + R_j - distance);
+                sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_MulV2F(overlap, 1.0f/2.0f));
+                sim->positions[j] = HMM_SubV2(sim->positions[j], HMM_MulV2F(overlap, 1.0f/2.0f));
+            }
         }
     }
 }
 
-// https://www.youtube.com/watch?v=bSVfItpvG5Q & https://en.wikipedia.org/wiki/Elastic_collision
-static void collide_elastic(const Simulation *sim, const usize i, const usize j) {
-    const f32 R_i = body_radius(sim, sim->m[i]);
-    const f32 R_j = body_radius(sim, sim->m[j]);
-    const HMM_Vec2 delta = HMM_SubV2(sim->r[i], sim->r[j]);
-    const f32 distance = HMM_LenV2(delta);
-
-    // TODO: coefficient of restitution?
-    const f32 angle = atan2f(delta.Y, delta.X);
-    HMM_Vec2 i_norm = HMM_RotateV2(sim->v[i], -angle);
-    HMM_Vec2 j_norm = HMM_RotateV2(sim->v[j], -angle);
-    const f32 i_final = ((sim->m[i] - sim->m[j]) / (sim->m[i] + sim->m[j])) * i_norm.X + ((2 * sim->m[j]) / (sim->m[i] + sim->m[j])) * j_norm.X;
-    const f32 j_final = ((2 * sim->m[i]) / (sim->m[i] + sim->m[j])) * i_norm.X + ((sim->m[j] - sim->m[i]) / (sim->m[i] + sim->m[j])) * j_norm.X;
-    i_norm.X = i_final;
-    j_norm.X = j_final;
-
-    sim->v[i] = HMM_RotateV2(i_norm, angle);
-    sim->v[j] = HMM_RotateV2(j_norm, angle);
-
-    const f32 overlap_distance = R_i + R_j - distance;
-    if (overlap_distance > EPSILON) {
-        const HMM_Vec2 overlap = HMM_MulV2F(HMM_NormV2(delta), R_i + R_j - distance);
-        sim->r[i] = HMM_AddV2(sim->r[i], HMM_MulV2F(overlap, 1.0f/2.0f));
-        sim->r[j] = HMM_SubV2(sim->r[j], HMM_MulV2F(overlap, 1.0f/2.0f));
-    }
-}
-
-static void collide_merge(const Simulation *sim, const usize i, const usize j) {
-    sim->m[i] = sim->m[i] + sim->m[j];
-    sim->v[i] = HMM_MulV2F(HMM_AddV2(
-        HMM_MulV2F(sim->v[i], sim->m[i]),
-        HMM_MulV2F(sim->v[j], sim->m[j])
-    ), 1.0f / (sim->m[i] + sim->m[j]));
-
-    // TODO: delete body j
-}
 
 f32 body_radius(const Simulation *sim, const f32 mass) {
     return powf(mass / sim->options.density, 1.0f/3.0f);
@@ -212,19 +190,19 @@ void simulation_copy(const Simulation *source, Simulation *destination) {
     *destination = (Simulation) { 0 };
     destination->options = source->options;
 
-    arrsetcap(destination->r, arrlenu(source->r));
-    arrsetcap(destination->v, arrlenu(source->v));
-    arrsetcap(destination->m, arrlenu(source->m));
+    arrsetcap(destination->positions, arrlenu(source->positions));
+    arrsetcap(destination->velocities, arrlenu(source->velocities));
+    arrsetcap(destination->masses, arrlenu(source->masses));
     arrsetcap(destination->movable, arrlenu(source->movable));
-    for (usize i = 0; i < arrlenu(source->r); i++) arrput(destination->r, source->r[i]);
-    for (usize i = 0; i < arrlenu(source->m); i++) arrput(destination->m, source->m[i]);
-    for (usize i = 0; i < arrlenu(source->v); i++) arrput(destination->v, source->v[i]);
+    for (usize i = 0; i < arrlenu(source->positions); i++) arrput(destination->positions, source->positions[i]);
+    for (usize i = 0; i < arrlenu(source->masses); i++) arrput(destination->masses, source->masses[i]);
+    for (usize i = 0; i < arrlenu(source->velocities); i++) arrput(destination->velocities, source->velocities[i]);
     for (usize i = 0; i < arrlenu(source->movable); i++) arrput(destination->movable, source->movable[i]);
 }
 
 void simulation_free(Simulation *sim) {
-    arrfree(sim->r);
-    arrfree(sim->v);
-    arrfree(sim->m);
+    arrfree(sim->positions);
+    arrfree(sim->velocities);
+    arrfree(sim->masses);
     arrfree(sim->movable);
 }

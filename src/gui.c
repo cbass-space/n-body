@@ -22,7 +22,7 @@ i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
 
     ImGui_StyleColorsDark(NULL);
     const f32 main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
-    ImGuiStyle* style = ImGui_GetStyle();
+    ImGuiStyle *style = ImGui_GetStyle();
     ImGuiStyle_ScaleAllSizes(style, main_scale);
     style->FontScaleDpi = main_scale;
 
@@ -38,72 +38,82 @@ i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
     return 0;
 }
 
-static void HelpMarker(const char* desc);
+static void HelpMarker(const char *desc);
+static void gui_create_body(Ghost *ghost);
+static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam);
+static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Predictions *predictions, GraphicsOptions *gfx);
 void gui_update(const GuiUpdateInfo *info) {
     cImGui_ImplSDLGPU3_NewFrame();
     cImGui_ImplSDL3_NewFrame();
     ImGui_NewFrame();
-
     ImGui_Begin("N-Body Simulator", NULL, ImGuiWindowFlags_AlwaysAutoResize);
 
-    if (ImGui_CollapsingHeader("Welcome!", 0)) {
-        ImGui_Text("Thanks for coming :)");
-    }
+    gui_create_body(info->ghost);
+    gui_inspector(info->sim, info->gfx, info->cam);
+    gui_controls(info->app, &info->sim->options, info->predictions, &info->gfx->options);
 
+    ImGui_End();
+    ImGui_Render();
+}
+
+static void gui_create_body(Ghost *ghost) {
     if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui_Checkbox("Body creation mode!", &info->ghost->mode);
+        ImGui_Checkbox("Body creation mode!", &ghost->enabled);
         HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
-        ImGui_BeginDisabled(!info->ghost->mode);
-        ImGui_DragFloat("Mass", &info->ghost->mass);
+        ImGui_BeginDisabled(!ghost->enabled);
+        ImGui_DragFloat("Mass", &ghost->mass);
         HelpMarker("The mass of the new body.");
-        ImGui_ColorEdit3("Color", (f32*) &info->ghost->color, 0);
+        ImGui_ColorEdit3("Color", (f32 *) &ghost->color, 0);
         HelpMarker("The color of the new body.");
-        ImGui_Checkbox("Movable", &info->ghost->movable);
+        ImGui_Checkbox("Movable", &ghost->movable);
         HelpMarker("Whether the body should be simulated or remain in place.");
         ImGui_EndDisabled();
     }
+}
 
+static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam) {
     if (ImGui_CollapsingHeader("Simulation Inspector", 0)) {
         ImGui_SeparatorText("Edit Bodies");
-        for (usize i = 0; i < arrlenu(info->sim->r); i++) {
+        for (usize i = 0; i < sim->body_count; i++) {
             ImGui_PushIDInt((i32) i);
-            if (ImGui_TreeNodeExStr("", ImGuiTreeNodeFlags_DefaultOpen, "Body %d", (i32) i)) {
-                if (ImGui_ColorEdit3("Color", (f32*) &info->gfx->colors[i], 0)) info->gfx->dirty_flag = (GraphicsDirtyFlag) {
+            if (ImGui_TreeNodeExStr("", 0, "Body %d", (i32) i)) {
+                if (ImGui_ColorEdit3("Color", (f32 *) &gfx->colors[i], 0)) gfx->dirty_flag = (GraphicsDirtyFlag) {
                     .type = DIRTY_COLOR,
                     .index = i,
-                    .color = info->gfx->colors[i]
+                    .color = gfx->colors[i]
                 };
 
-                if (ImGui_DragFloat("Mass", &info->sim->m[i])) info->gfx->dirty_flag = (GraphicsDirtyFlag) {
+                if (ImGui_DragFloat("Mass", &sim->masses[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
                     .type = DIRTY_MASS,
                     .index = i,
-                    .mass = info->sim->m[i]
+                    .mass = sim->masses[i]
                 };
 
-                ImGui_DragFloat2("Position", (f32*) &info->sim->r[i]);
-                ImGui_DragFloat2("Velocity", (f32*) &info->sim->v[i]);
+                ImGui_DragFloat2("Position", (f32 *) &sim->positions[i]);
+                ImGui_DragFloat2("Velocity", (f32 *) &sim->velocities[i]);
 
-                if (ImGui_Checkbox("Movable", &info->sim->movable[i])) info->gfx->dirty_flag = (GraphicsDirtyFlag) {
+                if (ImGui_Checkbox("Movable", &sim->movable[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
                     .type = DIRTY_MOVABLE,
                     .index = i,
-                    .movable = info->sim->movable[i]
+                    .movable = sim->movable[i]
                 };
 
-                if (ImGui_Button("Follow Body")) info->cam->target = i;
+                if (ImGui_Button("Follow Body")) cam->target = i;
                 ImGui_TreePop();
             }
             ImGui_PopID();
         }
     }
 
+}
+static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Predictions *predictions, GraphicsOptions *gfx) {
     if (ImGui_CollapsingHeader("Controls and Options", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui_SeparatorText("Controls");
-        ImGui_Checkbox("Pause Simulation", &info->sim->options.paused);
+        ImGui_Checkbox("Pause Simulation", &sim->paused);
         ImGui_Button("Reset Simulation");
 
         ImGui_SeparatorText("Simulation Options");
-        SimulationOptions *sim = &info->sim->options;
-        ImGui_DragFloat("Time Step", &info->app->fixed_delta_time);
+        ImGui_DragFloat("Time Step", &app->fixed_delta_time);
         ImGui_DragFloat("Gravity Coefficient", &sim->gravity);
         HelpMarker("Strength of the gravitational force between two bodies.");
         ImGui_DragFloat("Softening Coefficient", &sim->softening);
@@ -111,35 +121,26 @@ void gui_update(const GuiUpdateInfo *info) {
         ImGui_DragFloat("Density Coefficient", &sim->density);
         HelpMarker("How dense each body is.");
         const char *integrators[] = { "Semi-Implicit Euler", "Velocity Verlet", "Runge-Kutta 4" };
-        ImGui_ComboChar("Integrator", (i32*) &sim->integrator, integrators, IM_ARRAYSIZE(integrators));
+        ImGui_ComboChar("Integrator", (i32 *) &sim->integrator, integrators, IM_COUNTOF(integrators));
         HelpMarker("The algorithm used to calculate the new velocity and position of each body given the acceleration. Euler is the most performant, Verlet is more accurate while still conserving energy, and RK4 is the most accurate across short time spans but does not conserve energy.");
-        const char *collisions[] = { "No Collisions", "Merge on Collision", "Bounce on Collision" };
-        ImGui_ComboChar("Collisions", (i32*) &sim->collisions, collisions, IM_ARRAYSIZE(collisions));
-        HelpMarker("How to handle body collisions.");
-        if (sim->collisions == COLLISIONS_BOUNCE) {
-            static f32 cor = 1.0f;
-            ImGui_SliderFloat("Restitution Coefficient", &cor, 0.0f, 1.0f);
-            HelpMarker("A coefficient of 0.0 leads to a perfectly inelastic collision, while a coefficient of 1.0 is a perfectly elastic collision.");
-        }
+        ImGui_Checkbox("Collisions", &sim->collide);
+        HelpMarker("Whether to handle body collisions (expensive compute!)");
 
-        ImGui_Checkbox("Predict Body Motion", &info->predictions->enabled);
+        ImGui_Checkbox("Predict Body Motion", &predictions->enabled);
         HelpMarker("Simulate planets into the future and draw their trajectories (expensive compute!)");
 
         ImGui_SeparatorText("Drawing Options");
-        ImGui_ColorEdit3("Space Color", (f32*) &info->gfx->options.clear_color, 0);
-        ImGui_SliderFloat("Movable Body Outline", &info->gfx->options.movable_outline, 0.0f, 1.0f);
+        ImGui_ColorEdit3("Space Color", (f32 *) &gfx->clear_color, 0);
+        ImGui_SliderFloat("Movable Body Outline", &gfx->movable_outline, 0.0f, 1.0f);
         HelpMarker("The thickness of the outline around movable bodies.");
-        ImGui_SliderFloat("Static Body Outline", &info->gfx->options.static_outline, 0.0f, 1.0f);
+        ImGui_SliderFloat("Static Body Outline", &gfx->static_outline, 0.0f, 1.0f);
         HelpMarker("The thickness of the outline around non-movable bodies.");
-        ImGui_SliderFloat("Trail brightness", &info->gfx->options.trail_brightness, 0.0f, 1.0f);
+        ImGui_SliderFloat("Trail brightness", &gfx->trail_brightness, 0.0f, 1.0f);
         HelpMarker("The brightness of the trail that each body leaves behind as it moves.");
     }
-
-    ImGui_End();
-    ImGui_Render();
 }
 
-static void HelpMarker(const char* desc) {
+static void HelpMarker(const char *desc) {
     ImGui_SameLine();
     ImGui_TextDisabled("(?)");
     if (ImGui_BeginItemTooltip()) {

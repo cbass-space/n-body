@@ -28,7 +28,16 @@ def main():
 
     for input_file in glsl_files:
         output_file = out_dir / f"{input_file.stem}.spv"
-        shader_type = "vertex" if "vert" in input_file.stem else "fragment"
+
+        if "vert" in input_file.stem:
+            shader_type = "vertex"
+        elif "frag" in input_file.stem:
+            shader_type = "fragment"
+        elif "comp" in input_file.stem:
+            shader_type = "compute"
+        else:
+            print(f"Skipping {input_file} (unknown type)")
+            continue
 
         try:
             subprocess.run([

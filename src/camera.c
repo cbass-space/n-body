@@ -37,7 +37,7 @@ HMM_Vec2 mouse_world_position(const Camera *cam, SDL_Window *window) {
     return screen_to_world(cam, window, mouse);
 }
 
-void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, const bool ghost_mode) {
+void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, const bool ghost_enabled) {
     HMM_Vec2 mouse_delta = { 0 };
     if (SDL_GetRelativeMouseState(&mouse_delta.X, &mouse_delta.Y) & SDL_BUTTON_RMASK) {
         cam->target = (usize) -1;
@@ -46,7 +46,7 @@ void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, const
         cam->position = HMM_AddV2(cam->position, mouse_delta);
     }
 
-    if (event->type == SDL_EVENT_MOUSE_WHEEL && !ghost_mode) {
+    if (event->type == SDL_EVENT_MOUSE_WHEEL && !ghost_enabled) {
         const HMM_Vec2 mouse_old = mouse_world_position(cam, window);
         cam->zoom *= SDL_expf(event->wheel.y * -0.1f);
 
@@ -60,11 +60,11 @@ void camera_mouse(Camera *cam, const SDL_Event *event, SDL_Window *window, const
 
 void camera_keyboard(Camera *cam, const SDL_Event *event, const Simulation *sim) {
     if (event->type != SDL_EVENT_KEY_DOWN) return;
-    if (event->key.scancode == SDL_SCANCODE_RIGHTBRACKET) cam->target = (cam->target + 1) % arrlenu(sim->r);
-    if (event->key.scancode == SDL_SCANCODE_LEFTBRACKET) cam->target = (cam->target - 1 + arrlenu(sim->r)) % arrlenu(sim->r);
+    if (event->key.scancode == SDL_SCANCODE_RIGHTBRACKET) cam->target = (cam->target + 1) % arrlenu(sim->positions);
+    if (event->key.scancode == SDL_SCANCODE_LEFTBRACKET) cam->target = (cam->target - 1 + arrlenu(sim->positions)) % arrlenu(sim->positions);
 }
 
 void camera_update(Camera *cam, const Simulation *sim) {
     if (cam->target == (usize) -1) return;
-    cam->position = sim->r[cam->target];
+    cam->position = sim->positions[cam->target];
 }

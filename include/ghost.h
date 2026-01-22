@@ -15,7 +15,7 @@ typedef struct Ghost {
     HMM_Vec2 relative_position;
     f32 mass;
     bool movable;
-    bool mode;
+    bool enabled;
 } Ghost;
 
 void ghost_init(Ghost *ghost);

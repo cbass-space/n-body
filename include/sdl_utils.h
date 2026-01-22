@@ -20,24 +20,56 @@ static inline SDL_GPUShader *LoadSPIRVShader(SDL_GPUDevice *gpu, const char *sha
     if (SDL_strstr(shader_path, ".vert")) stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
     else if (SDL_strstr(shader_path, ".frag")) stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
     else {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_strstr() in LoadSPIRV(): Shader at path %s must include `.vert` or `.frag` to determine shader type.\n", shader_path);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_strstr() in LoadSPIRVShader(): Shader at path %s must include `.vert` or `.frag` to determine shader type.\n", shader_path);
         return NULL;
     }
 
     usize shader_size;
     const void *shader_code = SDL_LoadFile(shader_path, &shader_size);
     if (shader_code == NULL) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_LoadFile() in LoadSPIRV(): Couldn't find shader at path %s.\n", shader_path);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_LoadFile() in LoadSPIRVShader(): Couldn't find shader at path %s.\n", shader_path);
         return NULL;
     }
 
     const SDL_ShaderCross_GraphicsShaderMetadata *metadata = SDL_ShaderCross_ReflectGraphicsSPIRV(shader_code, shader_size, 0);
-    return SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(gpu, &(SDL_ShaderCross_SPIRV_Info) {
+    SDL_GPUShader *shader = SDL_ShaderCross_CompileGraphicsShaderFromSPIRV(gpu, &(SDL_ShaderCross_SPIRV_Info) {
         .bytecode = shader_code,
         .bytecode_size = shader_size,
         .entrypoint = "main",
         .shader_stage = stage,
     }, &metadata->resource_info, 0);
+
+    SDL_free((void *) shader_code);
+    SDL_free((void *) metadata);
+    return shader;
+}
+
+static inline void PrintSPIRVShader(const char *shader_path) {
+    SDL_ShaderCross_ShaderStage stage;
+    if (SDL_strstr(shader_path, ".vert")) stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
+    else if (SDL_strstr(shader_path, ".frag")) stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
+    else {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_strstr() in PrintSPIRVShader(): Shader at path %s must include `.vert` or `.frag` to determine shader type.\n", shader_path);
+        return;
+    }
+
+    usize shader_size;
+    const void *shader_code = SDL_LoadFile(shader_path, &shader_size);
+    if (shader_code == NULL) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_LoadFile() in PrintSPIRVShader(): Couldn't find shader at path %s.\n", shader_path);
+        return;
+    }
+
+    char *metal = SDL_ShaderCross_TranspileMSLFromSPIRV(&(SDL_ShaderCross_SPIRV_Info) {
+        .bytecode = shader_code,
+        .bytecode_size = shader_size,
+        .entrypoint = "main",
+        .shader_stage = stage,
+    });
+
+    printf("%s\n--------\n%s\n", shader_path, metal);
+    SDL_free(metal);
+    SDL_free((void *) shader_code);
 }
 
 typedef struct {
@@ -65,6 +97,23 @@ static inline SDL_GPUGraphicsPipeline *CreateGPUGraphicsPipeline(SDL_GPUDevice *
     SDL_ReleaseGPUShader(gpu, vertex_shader);
     SDL_ReleaseGPUShader(gpu, fragment_shader);
     return pipeline;
+}
+
+static inline SDL_GPUComputePipeline *CreateGPUComputePipeline(SDL_GPUDevice *gpu, const char *shader_path) {
+    size_t shader_size;
+    const void *shader_code = SDL_LoadFile(shader_path, &shader_size);
+    if (shader_code == NULL) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_LoadFile() in CreateGPUComputePipeline(): Couldn't find shader at path %s.\n", shader_path);
+        return NULL;
+    }
+
+    const SDL_ShaderCross_ComputePipelineMetadata *metadata = SDL_ShaderCross_ReflectComputeSPIRV(shader_code, shader_size, 0);
+    return SDL_ShaderCross_CompileComputePipelineFromSPIRV(gpu, &(SDL_ShaderCross_SPIRV_Info) {
+        .bytecode = shader_code,
+        .bytecode_size = shader_size,
+        .entrypoint = "main",
+        .shader_stage = SDL_SHADERCROSS_SHADERSTAGE_COMPUTE,
+    }, metadata, 0);
 }
 
 typedef struct {
@@ -115,10 +164,10 @@ typedef struct {
     SDL_GPUBufferCreateInfo info;
     u32 used;
 } GPUArray;
-static inline GPUArray CreateGPUArray(SDL_GPUDevice *gpu, const u32 size) {
+static inline GPUArray CreateGPUArray(SDL_GPUDevice *gpu, const u32 size, const SDL_GPUBufferUsageFlags flags) {
     const SDL_GPUBufferCreateInfo info = {
         .size = size,
-        .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ
+        .usage = flags
     };
 
     return (GPUArray) {
