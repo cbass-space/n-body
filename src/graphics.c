@@ -152,10 +152,10 @@ void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info) {
 static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass) {
     if (gfx->dirty_flag.type == DIRTY_NONE) return;
 
-    UploadGPUBufferBinding binding;
+    WriteGPUBufferBinding binding;
     switch (gfx->dirty_flag.type) {
         case DIRTY_MASS:
-            binding = (UploadGPUBufferBinding) {
+            binding = (WriteGPUBufferBinding) {
                 .buffer = gfx->gpu_masses.buffer,
                 .source = (u8 *) &gfx->dirty_flag.mass,
                 .size = sizeof(f32),
@@ -164,7 +164,7 @@ static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopy
             break;
         case DIRTY_COLOR:
             gfx->colors[gfx->dirty_flag.index] = gfx->dirty_flag.color;
-            binding = (UploadGPUBufferBinding) {
+            binding = (WriteGPUBufferBinding) {
                 .buffer = gfx->gpu_colors.buffer,
                 .source = (u8 *) &gfx->dirty_flag.color,
                 .size = 3 * sizeof(f32),
@@ -172,7 +172,7 @@ static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopy
             };
             break;
         case DIRTY_MOVABLE:
-            binding = (UploadGPUBufferBinding) {
+            binding = (WriteGPUBufferBinding) {
                 .buffer = gfx->gpu_movables.buffer,
                 .source = (u8 *) &(f32) { gfx->dirty_flag.movable },
                 .size = sizeof(f32),
@@ -184,7 +184,7 @@ static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopy
             break;
     }
 
-    UploadIntoGPUBuffers(gpu, copy_pass, &binding, 1);
+    WriteToGPUBuffers(gpu, copy_pass, &binding, 1);
     gfx->dirty_flag.type = DIRTY_NONE;
 }
 
@@ -235,9 +235,9 @@ static void graphics_uniform_constants(Graphics *gfx, SDL_GPUCommandBuffer *comm
 static void graphics_simulation_update(const Graphics *gfx, const Simulation *sim, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass) {
     if (sim->options.paused) return;
 
-    UploadGPUBufferBinding *bindings = SDL_malloc(sim->body_count * sizeof(UploadGPUBufferBinding));
+    WriteGPUBufferBinding *bindings = SDL_malloc(sim->body_count * sizeof(WriteGPUBufferBinding));
     for (usize i = 0; i < sim->body_count; i++) {
-        bindings[i] = (UploadGPUBufferBinding) {
+        bindings[i] = (WriteGPUBufferBinding) {
             .buffer = gfx->gpu_trails.buffer,
             .source = (u8 *) &sim->positions[i],
             .size = sizeof(HMM_Vec2),
@@ -245,7 +245,7 @@ static void graphics_simulation_update(const Graphics *gfx, const Simulation *si
         };
     }
 
-    UploadIntoGPUBuffers(gpu, copy_pass, bindings, sim->body_count);
+    WriteToGPUBuffers(gpu, copy_pass, bindings, sim->body_count);
     SDL_free(bindings);
 }
 
@@ -253,9 +253,9 @@ static void graphics_predictions_update(const Graphics *gfx, const Predictions *
     if (!predictions->enabled) return;
 
     usize bindings_count = 0;
-    UploadGPUBufferBinding bindings[2];
+    WriteGPUBufferBinding bindings[2];
     if (arrlen(predictions->positions)) {
-        bindings[bindings_count++] = (UploadGPUBufferBinding) {
+        bindings[bindings_count++] = (WriteGPUBufferBinding) {
             .buffer = gfx->gpu_predictions.buffer,
             .source = (u8 *) predictions->positions,
             .size = PREDICTION_SIZE * arrlenu(gfx->colors),
@@ -263,14 +263,14 @@ static void graphics_predictions_update(const Graphics *gfx, const Predictions *
     }
 
     if (ghost_enabled) {
-        bindings[bindings_count++]  = (UploadGPUBufferBinding) {
+        bindings[bindings_count++]  = (WriteGPUBufferBinding) {
             .buffer = gfx->gpu_ghost_predictions,
             .source = (u8 *) predictions->ghost_positions,
             .size = PREDICTION_SIZE
         };
     }
 
-    UploadIntoGPUBuffers(gpu, copy_pass, bindings, bindings_count);
+    WriteToGPUBuffers(gpu, copy_pass, bindings, bindings_count);
 }
 
 static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, SDL_GPURenderPass *render_pass) {

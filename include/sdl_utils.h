@@ -122,13 +122,11 @@ typedef struct {
     u32 size;
     u32 source_offset;
     u32 buffer_offset;
-} UploadGPUBufferBinding;
-static inline void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const UploadGPUBufferBinding *bindings, const usize num_bindings) {
-    if (num_bindings == 0) return;
+} WriteGPUBufferBinding;
+static inline void WriteToGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const WriteGPUBufferBinding *bindings, const usize bindings_count) {
+    if (bindings_count == 0) return;
     u32 total_size = 0;
-    for (usize i = 0; i < num_bindings; i++) {
-        total_size += bindings[i].size;
-    }
+    for (usize i = 0; i < bindings_count; i++) total_size += bindings[i].size;
 
     SDL_GPUTransferBuffer *transfer_buffer = SDL_CreateGPUTransferBuffer(gpu, &(SDL_GPUTransferBufferCreateInfo) {
         .size = total_size,
@@ -136,16 +134,16 @@ static inline void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *cop
     });
 
     u32 data_offset = 0;
-    u8 *data = SDL_MapGPUTransferBuffer(gpu, transfer_buffer, false);
-    for (usize i = 0; i < num_bindings; i++) {
-        SDL_memcpy(data + data_offset, bindings[i].source + bindings[i].source_offset, bindings[i].size);
+    u8 *data_map = SDL_MapGPUTransferBuffer(gpu, transfer_buffer, false);
+    for (usize i = 0; i < bindings_count; i++) {
+        SDL_memcpy(data_map + data_offset, bindings[i].source + bindings[i].source_offset, bindings[i].size);
         data_offset += bindings[i].size;
     }
 
     SDL_UnmapGPUTransferBuffer(gpu, transfer_buffer);
 
     u32 buffer_offset = 0;
-    for (usize i = 0; i < num_bindings; ++i) {
+    for (usize i = 0; i < bindings_count; i++) {
         SDL_UploadToGPUBuffer(
             copy_pass,
             &(SDL_GPUTransferBufferLocation) { .transfer_buffer = transfer_buffer, .offset = buffer_offset },
@@ -156,6 +154,52 @@ static inline void UploadIntoGPUBuffers(SDL_GPUDevice *gpu, SDL_GPUCopyPass *cop
         buffer_offset += bindings[i].size;
     }
 
+    SDL_ReleaseGPUTransferBuffer(gpu, transfer_buffer);
+}
+
+typedef struct {
+    SDL_GPUBuffer *buffer;
+    u8 *destination;
+    u32 size;
+    u32 destination_offset;
+    u32 buffer_offset;
+} ReadGPUBufferBinding;
+static inline void ReadFromGPUBuffer(SDL_GPUDevice *gpu, const ReadGPUBufferBinding *bindings, const usize bindings_count) {
+    if (bindings_count == 0) return;
+    u32 total_size = 0;
+    for (usize i = 0; i < bindings_count; i++) total_size += bindings[i].size;
+
+    SDL_GPUTransferBuffer *transfer_buffer = SDL_CreateGPUTransferBuffer(gpu, &(SDL_GPUTransferBufferCreateInfo) {
+        .size = total_size,
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD
+    });
+
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    u32 buffer_offset = 0;
+    for (usize i = 0; i < bindings_count; i++) {
+        SDL_DownloadFromGPUBuffer(
+            copy_pass,
+            &(SDL_GPUBufferRegion) { .buffer = bindings[i].buffer, .offset = bindings[i].buffer_offset, .size = bindings[i].size },
+            &(SDL_GPUTransferBufferLocation) { .transfer_buffer = transfer_buffer, .offset = buffer_offset }
+        );
+
+        buffer_offset += bindings[i].size;
+    }
+
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_GPUFence *fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    SDL_WaitForGPUFences(gpu, true, &fence, 1);
+    SDL_ReleaseGPUFence(gpu, fence);
+
+    u32 data_offset = 0;
+    const u8 *data_map = SDL_MapGPUTransferBuffer(gpu, transfer_buffer, false);
+    for (usize i = 0; i < bindings_count; i++) {
+        SDL_memcpy(bindings[i].destination + bindings[i].destination_offset, data_map + data_offset, bindings[i].size);
+        data_offset += bindings[i].size;
+    }
+
+    SDL_UnmapGPUTransferBuffer(gpu, transfer_buffer);
     SDL_ReleaseGPUTransferBuffer(gpu, transfer_buffer);
 }
 
@@ -181,7 +225,7 @@ static inline void ExpandGPUArray(GPUArray *array, SDL_GPUDevice *gpu, SDL_GPUCo
     if ((array->used + size) <= array->info.size) return;
 
     SDL_GPUBuffer *old_buffer = array->buffer;
-    u32 old_size = array->info.size;
+    const u32 old_size = array->info.size;
     array->info.size = (array->info.size + size) > 2 * array->info.size ? (array->info.size + size) : 2 * array->info.size;
     array->buffer = SDL_CreateGPUBuffer(gpu, &array->info);
 
@@ -203,10 +247,10 @@ typedef struct {
     u32 source_offset;
 } AppendGPUArrayBinding;
 static inline void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const AppendGPUArrayBinding *bindings, const usize num_bindings) {
-    UploadGPUBufferBinding *upload_bindings = SDL_malloc(sizeof(UploadGPUBufferBinding) * num_bindings);
+    WriteGPUBufferBinding *upload_bindings = SDL_malloc(sizeof(WriteGPUBufferBinding) * num_bindings);
     for (usize i = 0; i < num_bindings; i++) {
         ExpandGPUArray(bindings[i].array, gpu, copy_pass, bindings[i].size);
-        upload_bindings[i] = (UploadGPUBufferBinding) {
+        upload_bindings[i] = (WriteGPUBufferBinding) {
             .buffer = bindings[i].array->buffer,
             .source = bindings[i].source,
             .size = bindings[i].size,
@@ -217,7 +261,7 @@ static inline void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pas
         bindings[i].array->used += bindings[i].size;
     }
 
-    UploadIntoGPUBuffers(gpu, copy_pass, upload_bindings, num_bindings);
+    WriteToGPUBuffers(gpu, copy_pass, upload_bindings, num_bindings);
     SDL_free(upload_bindings);
 }
 
