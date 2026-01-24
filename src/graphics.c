@@ -61,11 +61,11 @@ i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window) {
     });
     if (!gfx->gpu_ghost_prediction_pipeline) return panic("SDL_CreateGPUGraphicsPipeline() in graphics_init()", "Failed to create ghost prediction graphics pipeline!");
 
-    gfx->gpu_trails = CreateGPUArray(gpu, TRAIL_SIZE,SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    gfx->gpu_predictions = CreateGPUArray(gpu, PREDICTION_SIZE,SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    gfx->gpu_masses = CreateGPUArray(gpu, sizeof(f32),SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    gfx->gpu_movables = CreateGPUArray(gpu, sizeof(f32),SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    gfx->gpu_colors = CreateGPUArray(gpu, sizeof(SDL_FColor),SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    gfx->gpu_trails = CreateGPUArray(gpu, TRAIL_SIZE, SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    gfx->gpu_predictions = CreateGPUArray(gpu, PREDICTION_SIZE, SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    gfx->gpu_masses = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    gfx->gpu_movables = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    gfx->gpu_colors = CreateGPUArray(gpu, sizeof(SDL_FColor), SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     if (!gfx->gpu_trails.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create trail storage buffer!");
     if (!gfx->gpu_predictions.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create predictions storage buffer!");
     if (!gfx->gpu_masses.buffer) return panic("CreateGPUArray() in graphics_init()", "Failed to create mass storage buffer!");
@@ -77,7 +77,7 @@ i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window) {
         .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ
     });
 
-    return 0;
+    return SDL_APP_CONTINUE;
 }
 
 usize graphics_add_body(Graphics *gfx, GraphicsAddBodyInfo *info) {

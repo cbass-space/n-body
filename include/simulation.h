@@ -2,7 +2,9 @@
 #define N_BODY_SIMULATION
 
 #include <stdbool.h>
+#include "SDL3/SDL_gpu.h"
 #include "HandmadeMath.h"
+#include "sdl_utils.h"
 #include "types.h"
 
 typedef struct {
@@ -20,24 +22,24 @@ typedef struct {
 
 typedef struct Simulation {
     SimulationOptions options;
-    HMM_Vec2 *positions;
-    HMM_Vec2 *velocities;
-    f32 *masses;
-    bool *movable;
+    SDL_GPUComputePipeline *pipeline;
+    GPUArray positions;
+    GPUArray velocities;
+    GPUArray masses;
+    GPUArray movable;
     u32 body_count;
 } Simulation;
 
-void simulation_init(Simulation *sim);
+i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu);
 typedef struct {
     HMM_Vec2 position;
     HMM_Vec2 velocity;
     f32 mass;
     bool movable;
 } SimulationAddBodyInfo;
-usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body);
-void simulation_update(Simulation *sim, f64 dt);
-void simulation_copy(const Simulation *source, Simulation *destination);
-void simulation_free(Simulation *sim);
+usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body);
+void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time);
+void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu);
 f32 body_radius(const Simulation *sim, f32 mass);
 
 #endif

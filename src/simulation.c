@@ -1,9 +1,11 @@
 #include "simulation.h"
 #include "constants.h"
+#include "sdl_utils.h"
 
 #include "stb_ds.h"
+#include "SDL3/SDL.h"
 
-void simulation_init(Simulation *sim) {
+i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
     sim->options = (SimulationOptions) {
         .gravity = GRAVITY_DEFAULT,
         .softening = SOFTENING_DEFAULT,
@@ -12,197 +14,79 @@ void simulation_init(Simulation *sim) {
         .collide = false,
         .paused = false
     };
+
+    sim->pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation.comp.spv");
+    if (!sim->pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create simulation compute pipeline!");
+
+    sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE);
+    sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE);
+    sim->masses = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ);
+    sim->movable = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ);
+    if (!sim->positions.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation position buffer!");
+    if (!sim->velocities.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation velocities buffer!");
+    if (!sim->masses.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation masses buffer!");
+    if (!sim->movable.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation movable buffer!");
+
+    return SDL_APP_CONTINUE;
 }
 
-usize simulation_add_body(Simulation *sim, const SimulationAddBodyInfo *body) {
-    arrput(sim->positions, body->position);
-    arrput(sim->velocities, body->velocity);
-    arrput(sim->masses, body->mass);
-    arrput(sim->movable, body->movable);
+usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body) {
+    const AppendGPUArrayBinding bindings[] = {
+        { .array = &sim->positions, .source = (u8 *) &body->position, .size = sizeof(HMM_Vec2) },
+        { .array = &sim->velocities, .source = (u8 *) &body->velocity, .size = sizeof(HMM_Vec2) },
+        { .array = &sim->masses, .source = (u8 *) &body->mass, .size = sizeof(HMM_Vec2) },
+        { .array = &sim->movable, .source = (u8 *) &body->movable, .size = sizeof(HMM_Vec2) },
+    };
+
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    AppendGPUArrays(gpu, copy_pass, bindings, sizeof(bindings) / sizeof(AppendGPUArrayBinding));
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
     return sim->body_count++;
 }
 
-static void integrate_euler(const Simulation *sim, usize i, f32 dt);
-static void integrate_verlet(const Simulation *sim, usize i, f32 dt);
-static void integrate_rk4(Simulation *sim, usize i, f32 dt);
-static void collide_bodies(const Simulation *sim);
-void simulation_update(Simulation *sim, const f64 dt) {
+void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time) {
     if (sim->options.paused) return;
 
-    for (usize i = 0; i < arrlenu(sim->positions); i++) {
-        if (!sim->movable[i]) {
-            sim->velocities[i] = (HMM_Vec2) { .X = 0.0f, .Y = 0.0f };
-            continue;
-        }
+    SDL_GPUBuffer *buffers[] = {
+        sim->positions.buffer,
+        sim->velocities.buffer,
+        sim->masses.buffer,
+        sim->movable.buffer,
+    };
 
-        switch (sim->options.integrator) {
-            case INTEGRATOR_EULER:
-                integrate_euler(sim, i, (f32) dt);
-                break;
-            case INTEGRATOR_VERLET:
-                integrate_verlet(sim, i, (f32) dt);
-                break;
-            case INTEGRATOR_RK4:
-                integrate_rk4(sim, i, (f32) dt);
-                break;
-        }
-    }
+    const SDL_GPUStorageBufferReadWriteBinding buffer_bindings[] = {
+        { .buffer = sim->positions.buffer, .cycle = false },
+        { .buffer = sim->velocities.buffer, .cycle = false },
+    };
 
-    collide_bodies(sim);
-}
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
+    SDL_PushGPUComputeUniformData(command_buffer, 0, &sim->options, sizeof(SimulationOptions));
+    SDL_PushGPUComputeUniformData(command_buffer, 1, &delta_time, sizeof(f32));
 
-static HMM_Vec2 gravitational_acceleration(const Simulation *sim, const HMM_Vec2 position, const usize skip_index) {
-    HMM_Vec2 net_acceleration = (HMM_Vec2) { 0 };
-
-    for (usize i = 0; i < arrlenu(sim->positions); i++) {
-        if (i == skip_index) continue;
-
-        const HMM_Vec2 separation = HMM_SubV2(sim->positions[i], position);
-        const f32 length_squared = HMM_LenSqrV2(separation) + powf(sim->options.softening, 2.0f);
-        if (length_squared < EPSILON) { return (HMM_Vec2) { 0 }; }
-
-        const HMM_Vec2 acceleration = HMM_MulV2F(
-            HMM_NormV2(separation),
-            (sim->options.gravity * sim->masses[i]) / length_squared
-        );
-
-        net_acceleration = HMM_AddV2(net_acceleration, acceleration);
-    }
-
-    return net_acceleration;
-}
-
-// https://gafferongames.com/post/integration_basics/#semi-implicit-euler
-static void integrate_euler(const Simulation *sim, const usize i, const f32 dt) {
-    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->positions[i], i);
-    sim->velocities[i] = HMM_AddV2(sim->velocities[i], HMM_MulV2F(acceleration, dt));
-    sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_MulV2F(sim->velocities[i], dt));
-}
-
-// https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
-static void integrate_verlet(const Simulation *sim, const usize i, const f32 dt) {
-    const HMM_Vec2 acceleration = gravitational_acceleration(sim, sim->positions[i], i);
-    sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_AddV2(
-        HMM_MulV2F(sim->velocities[i], dt),
-        HMM_MulV2F(acceleration, powf(dt, 2.0f) / 2.0f)
-    ));
-
-    const HMM_Vec2 new_acceleration = gravitational_acceleration(sim, sim->positions[i], i);
-    sim->velocities[i] = HMM_AddV2(sim->velocities[i],
-        HMM_MulV2F(HMM_AddV2(acceleration, new_acceleration),
-        dt / 2.0f)
-    );
-}
-
-typedef struct {
-    HMM_Vec2 position;
-    HMM_Vec2 velocity;
-} KinematicState;
-static KinematicState rk4_add(KinematicState a, KinematicState b);
-static KinematicState rk4_scale(KinematicState state, f32 a);
-static KinematicState rk4_delta(KinematicState state, const Simulation *sim, usize i);
-
-static void integrate_rk4(Simulation *sim, usize i, f32 dt) {
-    KinematicState state = { sim->positions[i], sim->velocities[i] };
-
-    KinematicState k_1 = rk4_delta(state, sim, i);
-    KinematicState k_2 = rk4_delta(rk4_add(state, rk4_scale(k_1, dt / 2.0f)), sim, i);
-    KinematicState k_3 = rk4_delta(rk4_add(state, rk4_scale(k_2, dt / 2.0f)), sim, i);
-    KinematicState k_4 = rk4_delta(rk4_add(state, rk4_scale(k_3, dt)), sim, i);
-
-    KinematicState k_sum = rk4_add(
-        k_1, rk4_add(
-            rk4_scale(k_2, 2),
-            rk4_add(rk4_scale(k_3, 2), k_4)
-        )
+    SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(
+        command_buffer,
+        NULL, 0,
+        buffer_bindings, sizeof(buffer_bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
     );
 
-    KinematicState new_state = rk4_add(state, rk4_scale(k_sum, dt / 6.0f));
-    sim->positions[i] = new_state.position;
-    sim->velocities[i] = new_state.velocity;
+    SDL_BindGPUComputePipeline(compute_pass, sim->pipeline);
+    SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
+    SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
+    SDL_EndGPUComputePass(compute_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
-
-static KinematicState rk4_add(const KinematicState a, const KinematicState b) {
-    return (KinematicState) {
-        .position = HMM_AddV2(a.position, b.position),
-        .velocity = HMM_AddV2(a.velocity, b.velocity),
-    };
-}
-
-static KinematicState rk4_scale(const KinematicState state, const f32 a) {
-    return (KinematicState) {
-        .position = HMM_MulV2F(state.position, a),
-        .velocity = HMM_MulV2F(state.velocity, a),
-    };
-}
-
-static KinematicState rk4_delta(const KinematicState state, const Simulation *sim, const usize i) {
-    return (KinematicState) {
-        .position = state.velocity,
-        .velocity = gravitational_acceleration(sim, state.position, i),
-    };
-}
-
-static void collide_bodies(const Simulation *sim) {
-    if (!sim->options.collide) return;
-
-    // TODO: bucket or quadtree optimization?
-    for (usize i = 0; i < arrlenu(sim->positions); i++) {
-        for (usize j = i + 1; j < arrlenu(sim->positions); j++) {
-            const f32 R_i = body_radius(sim, sim->masses[i]);
-            const f32 R_j = body_radius(sim, sim->masses[j]);
-
-            const HMM_Vec2 delta = HMM_SubV2(sim->positions[i], sim->positions[j]);
-            const f32 distance = HMM_LenV2(delta);
-            if (distance > R_i + R_j) continue;
-            const HMM_Vec2 relative_velocity = HMM_SubV2(sim->velocities[i], sim->velocities[j]);
-            if (HMM_DotV2(delta, relative_velocity) > 0.0) continue;
-
-            // TODO: coefficient of restitution?
-            // https://www.youtube.com/watch?v=bSVfItpvG5Q & https://en.wikipedia.org/wiki/Elastic_collision
-            const f32 angle = atan2f(delta.Y, delta.X);
-            HMM_Vec2 i_norm = HMM_RotateV2(sim->velocities[i], -angle);
-            HMM_Vec2 j_norm = HMM_RotateV2(sim->velocities[j], -angle);
-            const f32 i_final = ((sim->masses[i] - sim->masses[j]) / (sim->masses[i] + sim->masses[j])) * i_norm.X + (
-                                    (2 * sim->masses[j]) / (sim->masses[i] + sim->masses[j])) * j_norm.X;
-            const f32 j_final = ((2 * sim->masses[i]) / (sim->masses[i] + sim->masses[j])) * i_norm.X + (
-                                    (sim->masses[j] - sim->masses[i]) / (sim->masses[i] + sim->masses[j])) * j_norm.X;
-            i_norm.X = i_final;
-            j_norm.X = j_final;
-            sim->velocities[i] = HMM_RotateV2(i_norm, angle);
-            sim->velocities[j] = HMM_RotateV2(j_norm, angle);
-            const f32 overlap_distance = R_i + R_j - distance;
-            if (overlap_distance > EPSILON) {
-                const HMM_Vec2 overlap = HMM_MulV2F(HMM_NormV2(delta), R_i + R_j - distance);
-                sim->positions[i] = HMM_AddV2(sim->positions[i], HMM_MulV2F(overlap, 1.0f/2.0f));
-                sim->positions[j] = HMM_SubV2(sim->positions[j], HMM_MulV2F(overlap, 1.0f/2.0f));
-            }
-        }
-    }
-}
-
 
 f32 body_radius(const Simulation *sim, const f32 mass) {
     return powf(mass / sim->options.density, 1.0f/3.0f);
 }
 
-void simulation_copy(const Simulation *source, Simulation *destination) {
-    *destination = (Simulation) { 0 };
-    destination->options = source->options;
-
-    arrsetcap(destination->positions, arrlenu(source->positions));
-    arrsetcap(destination->velocities, arrlenu(source->velocities));
-    arrsetcap(destination->masses, arrlenu(source->masses));
-    arrsetcap(destination->movable, arrlenu(source->movable));
-    for (usize i = 0; i < arrlenu(source->positions); i++) arrput(destination->positions, source->positions[i]);
-    for (usize i = 0; i < arrlenu(source->masses); i++) arrput(destination->masses, source->masses[i]);
-    for (usize i = 0; i < arrlenu(source->velocities); i++) arrput(destination->velocities, source->velocities[i]);
-    for (usize i = 0; i < arrlenu(source->movable); i++) arrput(destination->movable, source->movable[i]);
-}
-
-void simulation_free(Simulation *sim) {
-    arrfree(sim->positions);
-    arrfree(sim->velocities);
-    arrfree(sim->masses);
-    arrfree(sim->movable);
+void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu) {
+    SDL_ReleaseGPUComputePipeline(gpu, sim->pipeline);
+    SDL_ReleaseGPUBuffer(gpu, sim->positions.buffer);
+    SDL_ReleaseGPUBuffer(gpu, sim->velocities.buffer);
+    SDL_ReleaseGPUBuffer(gpu, sim->masses.buffer);
+    SDL_ReleaseGPUBuffer(gpu, sim->movable.buffer);
 }
