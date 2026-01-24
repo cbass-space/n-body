@@ -3,7 +3,7 @@
 // #include "camera.h"
 // #include "ghost.h"
 // #include "prediction.h"
-// #include "graphics.h"
+#include "graphics.h"
 // #include "gui.h"
 
 #define SDL_MAIN_USE_CALLBACKS
@@ -28,7 +28,7 @@ typedef struct {
     // Camera cam;
     // Ghost ghost;
     // Predictions predictions;
-    // Graphics gfx;
+    Graphics gfx;
     // Gui gui;
 } Application;
 
@@ -68,7 +68,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     // camera_init(&app->cam);
     // ghost_init(&app->ghost);
     // prediction_init(&app->predictions);
-    // if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return panic("graphics_init() in app_init()", "Failed to initialize graphics!");
+    if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return panic("graphics_init() in app_init()", "Failed to initialize graphics!");
     // if (gui_init(&app->gui, app->window, app->gpu) != 0) return panic("gui_init() in app_init()", "Failed to initialize GUI!");
 
     return SDL_APP_CONTINUE;
@@ -92,15 +92,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         accumulator -= app->options.fixed_delta_time;
     }
 
-    HMM_Vec2 position;
-    ReadFromGPUBuffer(app->gpu, &(ReadGPUBufferBinding) {
-        .buffer = app->sim.positions.buffer,
-        .destination = (u8 *) &position,
-        .size = sizeof(position)
-    }, 1);
-
-    printf("(%f, %f)\n", position.X, position.Y);
-
     // ghost_update(&app->ghost, app->window, &app->sim, &app->cam);
 
     // gui_update(&(GuiUpdateInfo) {
@@ -112,14 +103,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     //     .gfx = &app->gfx,
     // });
 
-    // graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
-    //     .gpu = app->gpu,
-    //     .window = app->window,
-    //     .sim = &app->sim,
-    //     .cam = &app->cam,
-    //     .ghost = &app->ghost,
-    //     .predictions = &app->predictions
-    // });
+    graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
+        .gpu = app->gpu,
+        .window = app->window,
+        .sim = &app->sim,
+        // .cam = &app->cam,
+        // .ghost = &app->ghost,
+        // .predictions = &app->predictions
+    });
 
     return SDL_APP_CONTINUE;
 }
@@ -168,7 +159,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 
     simulation_free(&app->sim, app->gpu);
     // prediction_free(&app->predictions);
-    // graphics_free(&app->gfx, app->gpu);
+    graphics_free(&app->gfx, app->gpu);
     // gui_free();
 
     SDL_DestroyWindow(app->window);

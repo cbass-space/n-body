@@ -19,7 +19,7 @@ add_executable(${PROJECT_NAME} WIN32
 #    src/camera.c
 #    src/ghost.c
 #    src/prediction.c
-#    src/graphics.c
+    src/graphics.c
 #    src/gui.c
 
     include/constants.h
@@ -27,7 +27,7 @@ add_executable(${PROJECT_NAME} WIN32
 #    include/camera.h
 #    include/ghost.h
 #    include/prediction.h
-#    include/graphics.h
+    include/graphics.h
 #    include/gui.h
 )
 
