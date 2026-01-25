@@ -16,13 +16,16 @@ typedef struct {
     f32 gravity;
     f32 softening;
     f32 density;
-    bool collide;
+    // bool collide;
     bool paused;
 } SimulationOptions;
 
 typedef struct Simulation {
     SimulationOptions options;
-    SDL_GPUComputePipeline *pipeline;
+    SDL_GPUComputePipeline *euler_pipeline;
+    SDL_GPUComputePipeline *verlet_pipeline;
+    SDL_GPUComputePipeline *rk4_pipeline;
+
     GPUArray positions;
     GPUArray velocities;
     GPUArray masses;
@@ -40,6 +43,5 @@ typedef struct {
 usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body);
 void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time);
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu);
-f32 body_radius(const Simulation *sim, f32 mass);
 
 #endif

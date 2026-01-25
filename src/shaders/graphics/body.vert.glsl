@@ -9,19 +9,19 @@ struct VertexOut {
 layout (location = 0) out VertexOut frag;
 
 layout (std430, set = 0, binding = 0) readonly buffer Positions { vec2 positions[]; };
-//layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
-layout (std430, set = 0, binding = 1) readonly buffer Masses { float masses[]; };
-//layout (std430, set = 0, binding = 2) readonly buffer Movables { float movable[]; };
+layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
+layout (std430, set = 0, binding = 2) readonly buffer Masses { float masses[]; };
+layout (std430, set = 0, binding = 3) readonly buffer Movables { float movable[]; };
 
-layout (std140, set = 1, binding = 0) uniform TransformUniform {
+layout (std140, set = 1, binding = 0) uniform Transform {
     mat4 orthographic;
     mat4 view;
 };
 
-layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
+layout (std140, set = 1, binding = 1) uniform Constants {
     float density;
     float movable_outline;
-//    float static_outline;
+    float static_outline;
 //    uint current;
 //    vec2 _padding;
 };
@@ -31,12 +31,10 @@ float compute_radius(float mass) {
 }
 
 void main() {
-//    frag.color = colors[gl_InstanceIndex];
-    frag.color = vec4(1.0, 1.0, 1.0, 1.0);
+    frag.color = colors[gl_InstanceIndex];
     frag.position.x = 2.0 * floor(gl_VertexIndex / 2.0) - 1.0;
     frag.position.y = 2.0 * mod(gl_VertexIndex, 2.0) - 1.0;
-//    frag.outline = movable[gl_InstanceIndex] == 1.0 ? movable_outline : static_outline;
-    frag.outline = 0.1;
+    frag.outline = movable[gl_InstanceIndex] == 1.0 ? movable_outline : static_outline;
 
     float radius = compute_radius(masses[gl_InstanceIndex]);
     vec2 position = positions[gl_InstanceIndex];

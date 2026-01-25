@@ -6,7 +6,7 @@
 #define HEIGHT_DEFAULT 900
 #define FIXED_DELTA_TIME_DEFAULT 0.01f
 #define PREDICTION_DELTA_TIME_MULTIPLIER 1
-#define EPSILON 1e-6f
+#define EPSILON 1e-6f // TODO: turn into simulation parameter
 #define MAX_ACCUMULATOR_TIME 0.25
 
 // new body defaults

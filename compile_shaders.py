@@ -21,20 +21,24 @@ def main():
     out_dir = Path(sys.argv[2])
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    glsl_files = list(in_dir.rglob("*.glsl"))
+    glsl_files = list(in_dir.glob("**/*.glsl"))
     if not glsl_files:
         print(f"Warning! no shader files found in {in_dir}")
         sys.exit(0)
 
     for input_file in glsl_files:
-        output_file = out_dir / f"{input_file.stem}.spv"
+        relative_path = input_file.relative_to(in_dir)
+        output_file = (out_dir / relative_path).with_suffix(".spv")
+        output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        if "vert" in input_file.stem:
+        if ".vert" in input_file.stem:
             shader_type = "vertex"
-        elif "frag" in input_file.stem:
+        elif ".frag" in input_file.stem:
             shader_type = "fragment"
-        elif "comp" in input_file.stem:
+        elif ".comp" in input_file.stem:
             shader_type = "compute"
+        elif ".lib" in input_file.stem:
+            continue
         else:
             print(f"Skipping {input_file} (unknown type)")
             continue

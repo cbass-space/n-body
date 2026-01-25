@@ -267,6 +267,8 @@ static inline void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pas
 
 static inline SDL_AppResult panic(const char *location, const char *message) {
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s: %s\n", location, message);
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, SDL_GetError());
+    SDL_ClearError();
     return SDL_APP_FAILURE;
 }
 

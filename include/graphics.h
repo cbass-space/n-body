@@ -7,6 +7,7 @@
 #include "sdl_utils.h"
 
 typedef struct Simulation Simulation;
+typedef struct Trails Trails;
 // typedef struct Camera Camera;
 // typedef struct Ghost Ghost;
 // typedef struct Predictions Predictions;
@@ -39,19 +40,15 @@ typedef struct Graphics {
 
     // u32 trail_counter;
     u32 body_count;
-    // SDL_FColor *colors;
 
-    SDL_GPUGraphicsPipeline *gpu_circle_pipeline;
-    // SDL_GPUGraphicsPipeline *gpu_trail_pipeline;
+    SDL_GPUGraphicsPipeline *body_pipeline;
+    SDL_GPUGraphicsPipeline *trail_pipeline;
     // SDL_GPUGraphicsPipeline *gpu_prediction_pipeline;
     // SDL_GPUGraphicsPipeline *gpu_ghost_circle_pipeline;
     // SDL_GPUGraphicsPipeline *gpu_ghost_prediction_pipeline;
 
-    // GPUArray gpu_trails;
     // GPUArray gpu_predictions;
-    // GPUArray gpu_masses;
-    // GPUArray gpu_movables;
-    // GPUArray gpu_colors;
+    GPUArray colors;
 
     // SDL_GPUBuffer *gpu_ghost_predictions;
 } Graphics;
@@ -68,11 +65,12 @@ typedef struct {
     SDL_GPUDevice *gpu;
     SDL_Window *window;
     const Simulation *sim;
+    const Trails *trails;
     // const Camera *cam;
     // const Ghost *ghost;
     // const Predictions *predictions;
 } GraphicsDrawInfo;
-void graphics_draw(Graphics *gfx, const GraphicsDrawInfo *info);
+void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info);
 void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu);
 
 #endif

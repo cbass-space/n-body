@@ -11,17 +11,20 @@ i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
         .softening = SOFTENING_DEFAULT,
         .density = DENSITY_DEFAULT,
         .integrator = INTEGRATOR_DEFAULT,
-        .collide = false,
         .paused = false
     };
 
-    sim->pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation.comp.spv");
-    if (!sim->pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create simulation compute pipeline!");
+    sim->euler_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/euler.comp.spv");
+    sim->verlet_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/verlet.comp.spv");
+    sim->rk4_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/rk4.comp.spv"); // TODO: change to rk4
+    if (!sim->euler_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create euler compute pipeline!");
+    if (!sim->verlet_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create verlet compute pipeline!");
+    if (!sim->rk4_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create rk4 compute pipeline!");
 
-    sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE);
-    sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE);
-    sim->masses = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ);
-    sim->movable = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ);
+    sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    sim->masses = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    sim->movable = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     if (!sim->positions.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation position buffer!");
     if (!sim->velocities.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation velocities buffer!");
     if (!sim->masses.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation masses buffer!");
@@ -34,8 +37,8 @@ usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationA
     const AppendGPUArrayBinding bindings[] = {
         { .array = &sim->positions, .source = (u8 *) &body->position, .size = sizeof(HMM_Vec2) },
         { .array = &sim->velocities, .source = (u8 *) &body->velocity, .size = sizeof(HMM_Vec2) },
-        { .array = &sim->masses, .source = (u8 *) &body->mass, .size = sizeof(HMM_Vec2) },
-        { .array = &sim->movable, .source = (u8 *) &body->movable, .size = sizeof(HMM_Vec2) },
+        { .array = &sim->masses, .source = (u8 *) &body->mass, .size = sizeof(f32) },
+        { .array = &sim->movable, .source = (u8 *) &(f32) { body->movable }, .size = sizeof(f32) },
     };
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
@@ -50,21 +53,26 @@ usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationA
 void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time) {
     if (sim->options.paused) return;
 
-    SDL_GPUBuffer *buffers[] = {
-        sim->positions.buffer,
-        sim->velocities.buffer,
-        sim->masses.buffer,
-        sim->movable.buffer,
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
+
+    const struct {
+        u32 body_count;
+        f32 gravity;
+        f32 softening;
+        f32 delta_time;
+    } constants = {
+        sim->body_count,
+        sim->options.gravity,
+        sim->options.softening,
+        (f32) delta_time
     };
+
+    SDL_PushGPUComputeUniformData(command_buffer, 0, &constants, sizeof(constants));
 
     const SDL_GPUStorageBufferReadWriteBinding buffer_bindings[] = {
         { .buffer = sim->positions.buffer, .cycle = false },
         { .buffer = sim->velocities.buffer, .cycle = false },
     };
-
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-    SDL_PushGPUComputeUniformData(command_buffer, 0, &sim->options, sizeof(SimulationOptions));
-    SDL_PushGPUComputeUniformData(command_buffer, 1, &delta_time, sizeof(f32));
 
     SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(
         command_buffer,
@@ -72,19 +80,36 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delt
         buffer_bindings, sizeof(buffer_bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
     );
 
-    SDL_BindGPUComputePipeline(compute_pass, sim->pipeline);
+    SDL_GPUComputePipeline *integrator_pipeline = NULL;
+    switch (sim->options.integrator) {
+        case INTEGRATOR_EULER:
+            integrator_pipeline = sim->euler_pipeline;
+            break;
+        case INTEGRATOR_VERLET:
+            integrator_pipeline = sim->verlet_pipeline;
+            break;
+        case INTEGRATOR_RK4:
+            integrator_pipeline = sim->rk4_pipeline;
+            break;
+    }
+
+    SDL_BindGPUComputePipeline(compute_pass, integrator_pipeline);
+
+    SDL_GPUBuffer *buffers[] = {
+        sim->positions.buffer,
+        sim->velocities.buffer,
+        sim->masses.buffer,
+        sim->movable.buffer,
+    };
+
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
     SDL_EndGPUComputePass(compute_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
-f32 body_radius(const Simulation *sim, const f32 mass) {
-    return powf(mass / sim->options.density, 1.0f/3.0f);
-}
-
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu) {
-    SDL_ReleaseGPUComputePipeline(gpu, sim->pipeline);
+    SDL_ReleaseGPUComputePipeline(gpu, sim->euler_pipeline);
     SDL_ReleaseGPUBuffer(gpu, sim->positions.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->velocities.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->masses.buffer);

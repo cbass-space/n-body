@@ -1,5 +1,6 @@
 #include "constants.h"
 #include "simulation.h"
+#include "trails.h"
 // #include "camera.h"
 // #include "ghost.h"
 // #include "prediction.h"
@@ -25,6 +26,7 @@ typedef struct {
     SDL_Window *window;
     SDL_GPUDevice *gpu;
     Simulation sim;
+    Trails trails;
     // Camera cam;
     // Ghost ghost;
     // Predictions predictions;
@@ -40,11 +42,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     app->options = (ApplicationOptions) { .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT };
 
     // initialize SDL3
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return panic("SDL_Init() in app_init()", SDL_GetError());
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return panic("SDL_Init() in app_init()", "Failed to initialize SDL3!");
     const f32 main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     const SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     app->window = SDL_CreateWindow("N-Body Simulation", (i32)(WIDTH_DEFAULT * main_scale), (i32)(HEIGHT_DEFAULT * main_scale), window_flags);
-    if (!app->window) return panic("SDL_CreateWindow() in app_init()", SDL_GetError());
+    if (!app->window) return panic("SDL_CreateWindow() in app_init()", "Failed to create SDL window!");
     SDL_ShowWindow(app->window);
 
     SDL_SetLogPriority(SDL_LOG_CATEGORY_GPU, SDL_LOG_PRIORITY_VERBOSE);
@@ -52,24 +54,38 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     SDL_SetLogPriority(SDL_LOG_CATEGORY_ERROR, SDL_LOG_PRIORITY_VERBOSE);
 
     app->gpu = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, true, NULL);
-    if (!app->gpu) return panic("SDL_CreateGPU() in app_init()", SDL_GetError());
-    if (!SDL_ClaimWindowForGPUDevice(app->gpu, app->window)) return panic("SDL_ClaimWindowForGPU() in app_init()", SDL_GetError());
+    if (!app->gpu) return panic("SDL_CreateGPU() in app_init()", "Failed to create GPU device!");
+    if (!SDL_ClaimWindowForGPUDevice(app->gpu, app->window)) return panic("SDL_ClaimWindowForGPU() in app_init()", "Failed to claim window for GPU!");
     SDL_SetGPUSwapchainParameters(app->gpu, app->window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
 
     // initialize modules
-    simulation_init(&app->sim, app->gpu);
-    simulation_add_body(&app->sim, app->gpu, &(SimulationAddBodyInfo) {
-        .position = (HMM_Vec2) { 0 },
-        .velocity = (HMM_Vec2) { .X = 1.0f, .Y = 0.0f },
-        .mass = 100.0f,
-        .movable = true,
-    });
+    if (simulation_init(&app->sim, app->gpu) != 0) return panic("simulation_init() in app_init()", "Failed to initialize simulation!");
+    if (trails_init(&app->trails, app->gpu) != 0) return panic("trails_init() in app_init()", "Failed to initialize trail module!");
 
     // camera_init(&app->cam);
     // ghost_init(&app->ghost);
     // prediction_init(&app->predictions);
     if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return panic("graphics_init() in app_init()", "Failed to initialize graphics!");
     // if (gui_init(&app->gui, app->window, app->gpu) != 0) return panic("gui_init() in app_init()", "Failed to initialize GUI!");
+
+    simulation_add_body(&app->sim, app->gpu, &(SimulationAddBodyInfo) {
+        .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
+        .velocity = (HMM_Vec2) { .X = -25.0f, .Y = 0.0f },
+        .mass = 50.0f,
+        .movable = true,
+    });
+
+    simulation_add_body(&app->sim, app->gpu, &(SimulationAddBodyInfo) {
+        .position = (HMM_Vec2) { .X = 0.0f, .Y = 100.0f },
+        .velocity = (HMM_Vec2) { .X = 25.0f, .Y = 0.0f },
+        .mass = 50.0f,
+        .movable = true,
+    });
+
+    trails_add_body(&app->trails, app->gpu, (HMM_Vec2) { .X = 0.0f, .Y = -100.0f });
+    trails_add_body(&app->trails, app->gpu, (HMM_Vec2) { .X = 0.0f, .Y = 100.0f });
+    graphics_add_body(&app->gfx, &(GraphicsAddBodyInfo) { .gpu = app->gpu, .color = (SDL_FColor) { 0.0f, 1.0f, 1.0f, 1.0f } });
+    graphics_add_body(&app->gfx, &(GraphicsAddBodyInfo) { .gpu = app->gpu, .color = (SDL_FColor) { 1.0f, 0.0f, 1.0f, 1.0f } });
 
     return SDL_APP_CONTINUE;
 }
@@ -87,6 +103,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
         simulation_update(&app->sim, app->gpu, app->options.fixed_delta_time);
+        trails_update(&app->trails, app->gpu, &app->sim);
         // prediction_update(&app->predictions, &app->sim, &app->ghost, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
         // camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
@@ -107,6 +124,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .gpu = app->gpu,
         .window = app->window,
         .sim = &app->sim,
+        .trails = &app->trails,
         // .cam = &app->cam,
         // .ghost = &app->ghost,
         // .predictions = &app->predictions
@@ -158,6 +176,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
     SDL_ReleaseWindowFromGPUDevice(app->gpu, app->window);
 
     simulation_free(&app->sim, app->gpu);
+    trails_free(&app->trails, app->gpu);
     // prediction_free(&app->predictions);
     graphics_free(&app->gfx, app->gpu);
     // gui_free();

@@ -3,8 +3,8 @@
 layout (location = 0) out vec4 out_color;
 
 const uint TRAIL_LENGTH = 512;
-layout (std430, set = 0, binding = 0) readonly buffer PositionStorage { vec2 positions[][TRAIL_LENGTH]; };
-layout (std430, set = 0, binding = 1) readonly buffer ColorStorage { vec4 colors[]; };
+layout (std430, set = 0, binding = 0) readonly buffer Positions { vec2 positions[][TRAIL_LENGTH]; };
+layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
 
 layout (std140, set = 1, binding = 0) uniform TransformUniform {
     mat4 orthographic;
@@ -13,17 +13,17 @@ layout (std140, set = 1, binding = 0) uniform TransformUniform {
 
 layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
     vec3 _padding;
-    uint current;
+    uint frame;
     float brightness;
-    uint target;
+//    uint target;
 };
 
 void main() {
-    vec2 position = positions[gl_InstanceIndex][(current - gl_VertexIndex) % TRAIL_LENGTH];
-    if (target != uint(-1)) {
-        position += positions[target][current]
-            - positions[target][(current - gl_VertexIndex) % TRAIL_LENGTH];
-    }
+    vec2 position = positions[gl_InstanceIndex][(frame - gl_VertexIndex) % TRAIL_LENGTH];
+//    if (target != uint(-1)) {
+//        position += positions[target][frame]
+//            - positions[target][(frame - gl_VertexIndex) % TRAIL_LENGTH];
+//    }
 
     gl_Position = orthographic * view * vec4(position, 0.0, 1.0);
 

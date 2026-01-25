@@ -1,0 +1,22 @@
+#ifndef N_BODY_TRAILS
+#define N_BODY_TRAILS
+
+#include "sdl_utils.h"
+#include "HandmadeMath.h"
+
+typedef struct Simulation Simulation;
+
+typedef struct Trails {
+    u32 body_count;
+    u32 frame;
+    SDL_GPUComputePipeline *pipeline;
+    GPUArray array;
+} Trails;
+
+i32 trails_init(Trails *trails, SDL_GPUDevice *gpu);
+
+u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, HMM_Vec2 position);
+void trails_update(Trails *trails, SDL_GPUDevice *gpu, const Simulation *sim);
+void trails_free(const Trails *trails, SDL_GPUDevice *gpu);
+
+#endif
