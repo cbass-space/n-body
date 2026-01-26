@@ -11,7 +11,7 @@ i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
     if (!trajectories->pipeline) panic("Failed to create trajectories pipeline!");
 
     trajectories->positions = CreateGPUArray(gpu, PREDICTION_SIZE, SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    trajectories->velocities = CreateGPUArray(gpu, PREDICTION_SIZE, SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    trajectories->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     if (!trajectories->positions.buffer) panic("Failed to create trajectory buffer!");
     if (!trajectories->velocities.buffer) panic("Failed to create trajectory buffer!");
 
@@ -28,7 +28,7 @@ u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, const 
 
     const AppendGPUArrayBinding bindings[] = {
         { .array = &trajectories->positions, .source = (u8 *) &trajectory, .size = PREDICTION_SIZE },
-        { .array = &trajectories->velocities, .source = (u8 *) &trajectory, .size = PREDICTION_SIZE },
+        { .array = &trajectories->velocities, .source = (u8 *) &trajectory, .size = sizeof(HMM_Vec2) },
     };
 
     AppendGPUArrays(gpu, copy_pass, bindings, sizeof(bindings) / sizeof(AppendGPUArrayBinding));
@@ -43,11 +43,13 @@ void trajectories_update(const Trajectories *trajectories, SDL_GPUDevice *gpu, c
 
     const struct {
         u32 count;
+        u32 integrator;
         f32 gravity;
         f32 softening;
         f32 delta_time;
     } constants = {
         sim->body_count,
+        sim->options.integrator,
         sim->options.gravity,
         sim->options.softening,
         delta_time,

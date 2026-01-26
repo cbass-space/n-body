@@ -14,12 +14,8 @@ i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
         .paused = false
     };
 
-    sim->euler_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/euler.comp.spv");
-    sim->verlet_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/verlet.comp.spv");
-    sim->rk4_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/rk4.comp.spv"); // TODO: change to rk4
-    if (!sim->euler_pipeline) panic("Failed to create euler compute pipeline!");
-    if (!sim->verlet_pipeline) panic("Failed to create verlet compute pipeline!");
-    if (!sim->rk4_pipeline) panic("Failed to create rk4 compute pipeline!");
+    sim->pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation.comp.spv");
+    if (!sim->pipeline) panic("Failed to create simulation compute pipeline!");
 
     sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
@@ -57,11 +53,13 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delt
 
     const struct {
         u32 body_count;
+        u32 integrator;
         f32 gravity;
         f32 softening;
         f32 delta_time;
     } constants = {
         sim->body_count,
+        sim->options.integrator,
         sim->options.gravity,
         sim->options.softening,
         delta_time
@@ -80,21 +78,7 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delt
         buffer_bindings, sizeof(buffer_bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
     );
 
-    // TODO: i don't think putting these all into one shader would too bad
-    SDL_GPUComputePipeline *integrator_pipeline = NULL;
-    switch (sim->options.integrator) {
-        case INTEGRATOR_EULER:
-            integrator_pipeline = sim->euler_pipeline;
-            break;
-        case INTEGRATOR_VERLET:
-            integrator_pipeline = sim->verlet_pipeline;
-            break;
-        case INTEGRATOR_RK4:
-            integrator_pipeline = sim->rk4_pipeline;
-            break;
-    }
-
-    SDL_BindGPUComputePipeline(compute_pass, integrator_pipeline);
+    SDL_BindGPUComputePipeline(compute_pass, sim->pipeline);
     SDL_GPUBuffer *buffers[] = { sim->positions.buffer, sim->velocities.buffer, sim->masses.buffer, sim->movable.buffer, };
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
@@ -104,7 +88,7 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delt
 }
 
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu) {
-    SDL_ReleaseGPUComputePipeline(gpu, sim->euler_pipeline);
+    SDL_ReleaseGPUComputePipeline(gpu, sim->pipeline);
     SDL_ReleaseGPUBuffer(gpu, sim->positions.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->velocities.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->masses.buffer);

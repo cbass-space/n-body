@@ -22,9 +22,7 @@ typedef struct {
 
 typedef struct Simulation {
     SimulationOptions options;
-    SDL_GPUComputePipeline *euler_pipeline;
-    SDL_GPUComputePipeline *verlet_pipeline;
-    SDL_GPUComputePipeline *rk4_pipeline;
+    SDL_GPUComputePipeline *pipeline;
 
     GPUArray positions;
     GPUArray velocities;
