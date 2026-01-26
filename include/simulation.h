@@ -40,8 +40,9 @@ typedef struct {
     f32 mass;
     bool movable;
 } SimulationAddBodyInfo;
-usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body);
-void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time);
+
+u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body);
+void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, f32 delta_time);
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu);
 
 #endif

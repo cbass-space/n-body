@@ -1,9 +1,9 @@
 #include "constants.h"
 #include "simulation.h"
 #include "trails.h"
+#include "trajectory.h"
 // #include "camera.h"
 // #include "ghost.h"
-// #include "prediction.h"
 #include "graphics.h"
 // #include "gui.h"
 
@@ -27,14 +27,15 @@ typedef struct {
     SDL_GPUDevice *gpu;
     Simulation sim;
     Trails trails;
+    Trajectories trajectories;
     // Camera cam;
     // Ghost ghost;
-    // Predictions predictions;
     Graphics gfx;
     // Gui gui;
 } Application;
 
-SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
+static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color);
+SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     UNUSED(argc); UNUSED(argv);
 
     Application *app = SDL_calloc(1, sizeof(*app));
@@ -42,11 +43,11 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     app->options = (ApplicationOptions) { .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT };
 
     // initialize SDL3
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) return panic("SDL_Init() in app_init()", "Failed to initialize SDL3!");
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) panic("Failed to initialize SDL3!");
     const f32 main_scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay());
     const SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
     app->window = SDL_CreateWindow("N-Body Simulation", (i32)(WIDTH_DEFAULT * main_scale), (i32)(HEIGHT_DEFAULT * main_scale), window_flags);
-    if (!app->window) return panic("SDL_CreateWindow() in app_init()", "Failed to create SDL window!");
+    if (!app->window) panic("Failed to create SDL window!");
     SDL_ShowWindow(app->window);
 
     SDL_SetLogPriority(SDL_LOG_CATEGORY_GPU, SDL_LOG_PRIORITY_VERBOSE);
@@ -54,38 +55,40 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv) {
     SDL_SetLogPriority(SDL_LOG_CATEGORY_ERROR, SDL_LOG_PRIORITY_VERBOSE);
 
     app->gpu = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL, true, NULL);
-    if (!app->gpu) return panic("SDL_CreateGPU() in app_init()", "Failed to create GPU device!");
-    if (!SDL_ClaimWindowForGPUDevice(app->gpu, app->window)) return panic("SDL_ClaimWindowForGPU() in app_init()", "Failed to claim window for GPU!");
+    if (!app->gpu) panic("Failed to create GPU device!");
+    if (!SDL_ClaimWindowForGPUDevice(app->gpu, app->window)) panic("Failed to claim window for GPU!");
     SDL_SetGPUSwapchainParameters(app->gpu, app->window, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, SDL_GPU_PRESENTMODE_VSYNC);
 
     // initialize modules
-    if (simulation_init(&app->sim, app->gpu) != 0) return panic("simulation_init() in app_init()", "Failed to initialize simulation!");
-    if (trails_init(&app->trails, app->gpu) != 0) return panic("trails_init() in app_init()", "Failed to initialize trail module!");
+    if (simulation_init(&app->sim, app->gpu) != 0) panic("Failed to initialize simulation!");
+    if (trails_init(&app->trails, app->gpu) != 0) panic("Failed to initialize trail module!");
+    if (trajectories_init(&app->trajectories, app->gpu) != 0) panic("Failed to initialize trajectory module!");
+    if (graphics_init(&app->gfx, app->gpu, app->window) != 0) panic("Failed to initialize graphics!");
 
     // camera_init(&app->cam);
     // ghost_init(&app->ghost);
-    // prediction_init(&app->predictions);
-    if (graphics_init(&app->gfx, app->gpu, app->window) != 0) return panic("graphics_init() in app_init()", "Failed to initialize graphics!");
     // if (gui_init(&app->gui, app->window, app->gpu) != 0) return panic("gui_init() in app_init()", "Failed to initialize GUI!");
 
-    simulation_add_body(&app->sim, app->gpu, &(SimulationAddBodyInfo) {
+    add_body(app, &(SimulationAddBodyInfo) {
         .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
         .velocity = (HMM_Vec2) { .X = -25.0f, .Y = 0.0f },
         .mass = 50.0f,
         .movable = true,
-    });
+    }, &(SDL_FColor) { 1.0f, 0.0f, 1.0f, 1.0f });
 
-    simulation_add_body(&app->sim, app->gpu, &(SimulationAddBodyInfo) {
+    add_body(app, &(SimulationAddBodyInfo) {
         .position = (HMM_Vec2) { .X = 0.0f, .Y = 100.0f },
         .velocity = (HMM_Vec2) { .X = 25.0f, .Y = 0.0f },
         .mass = 50.0f,
         .movable = true,
-    });
+    }, &(SDL_FColor) { 0.0f, 1.0f, 1.0f, 1.0f });
 
-    trails_add_body(&app->trails, app->gpu, (HMM_Vec2) { .X = 0.0f, .Y = -100.0f });
-    trails_add_body(&app->trails, app->gpu, (HMM_Vec2) { .X = 0.0f, .Y = 100.0f });
-    graphics_add_body(&app->gfx, &(GraphicsAddBodyInfo) { .gpu = app->gpu, .color = (SDL_FColor) { 0.0f, 1.0f, 1.0f, 1.0f } });
-    graphics_add_body(&app->gfx, &(GraphicsAddBodyInfo) { .gpu = app->gpu, .color = (SDL_FColor) { 1.0f, 0.0f, 1.0f, 1.0f } });
+    add_body(app, &(SimulationAddBodyInfo) {
+        .position = (HMM_Vec2) { .X = 100.0f, .Y = 0.0f },
+        .velocity = (HMM_Vec2) { .Y = 10.0f },
+        .mass = 50.0f,
+        .movable = true,
+    }, &(SDL_FColor) { 1.0f, 1.0f, 0.0f, 1.0f });
 
     return SDL_APP_CONTINUE;
 }
@@ -104,6 +107,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     while (accumulator >= app->options.fixed_delta_time) {
         simulation_update(&app->sim, app->gpu, app->options.fixed_delta_time);
         trails_update(&app->trails, app->gpu, &app->sim);
+        trajectories_update(&app->trajectories, app->gpu, &app->sim, app->options.fixed_delta_time);
         // prediction_update(&app->predictions, &app->sim, &app->ghost, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
         // camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
@@ -125,16 +129,23 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .window = app->window,
         .sim = &app->sim,
         .trails = &app->trails,
+        .trajectories = &app->trajectories
         // .cam = &app->cam,
         // .ghost = &app->ghost,
-        // .predictions = &app->predictions
     });
 
     return SDL_APP_CONTINUE;
 }
 
+static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color) {
+    simulation_add_body(&app->sim, app->gpu, sim_info);
+    trails_add_body(&app->trails, app->gpu, sim_info->position);
+    trajectories_add_body(&app->trajectories, app->gpu, sim_info->position);
+    graphics_add_body(&app->gfx, app->gpu, color);
+}
+
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
-    Application *app = appstate;
+    // Application *app = appstate;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
 
     // gui_event(event);
@@ -167,7 +178,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void *appstate, SDL_AppResult result) {
+void SDL_AppQuit(void *appstate, const SDL_AppResult result) {
     UNUSED(result);
 
     Application *app = appstate;
@@ -177,7 +188,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result) {
 
     simulation_free(&app->sim, app->gpu);
     trails_free(&app->trails, app->gpu);
-    // prediction_free(&app->predictions);
+    trajectories_free(&app->trajectories, app->gpu);
     graphics_free(&app->gfx, app->gpu);
     // gui_free();
 

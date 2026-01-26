@@ -265,11 +265,12 @@ static inline void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pas
     SDL_free(upload_bindings);
 }
 
-static inline SDL_AppResult panic(const char *location, const char *message) {
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s: %s\n", location, message);
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, SDL_GetError());
-    SDL_ClearError();
-    return SDL_APP_FAILURE;
-}
+// TODO: get better error handling in here
+#define panic(message) do { \
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s:%d: %s\n", __FILE__, __LINE__, message); \
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, SDL_GetError()); \
+    SDL_ClearError(); \
+    return SDL_APP_FAILURE; \
+} while (0) \
 
 #endif

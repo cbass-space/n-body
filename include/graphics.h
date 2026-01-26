@@ -8,9 +8,9 @@
 
 typedef struct Simulation Simulation;
 typedef struct Trails Trails;
+typedef struct Trajectories Trajectories;
 // typedef struct Camera Camera;
 // typedef struct Ghost Ghost;
-// typedef struct Predictions Predictions;
 
 // typedef struct {
 //     enum {
@@ -43,13 +43,11 @@ typedef struct Graphics {
 
     SDL_GPUGraphicsPipeline *body_pipeline;
     SDL_GPUGraphicsPipeline *trail_pipeline;
-    // SDL_GPUGraphicsPipeline *gpu_prediction_pipeline;
+    SDL_GPUGraphicsPipeline *trajectory_pipeline;
     // SDL_GPUGraphicsPipeline *gpu_ghost_circle_pipeline;
     // SDL_GPUGraphicsPipeline *gpu_ghost_prediction_pipeline;
 
-    // GPUArray gpu_predictions;
     GPUArray colors;
-
     // SDL_GPUBuffer *gpu_ghost_predictions;
 } Graphics;
 
@@ -57,18 +55,17 @@ i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window);
 typedef struct {
     SDL_GPUDevice *gpu;
     SDL_FColor color;
-    // const Simulation *sim;
-    // usize index;
 } GraphicsAddBodyInfo;
-usize graphics_add_body(Graphics *gfx, GraphicsAddBodyInfo *info);
+
+u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_FColor *color);
 typedef struct {
     SDL_GPUDevice *gpu;
     SDL_Window *window;
     const Simulation *sim;
     const Trails *trails;
+    const Trajectories *trajectories;
     // const Camera *cam;
     // const Ghost *ghost;
-    // const Predictions *predictions;
 } GraphicsDrawInfo;
 void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info);
 void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu);

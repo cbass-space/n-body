@@ -1,18 +1,4 @@
-layout (std430, set = 0, binding = 0) buffer Positions { vec2 r[]; };
-layout (std430, set = 0, binding = 1) buffer Velocities { vec2 v[]; };
-layout (std430, set = 0, binding = 2) buffer Masses { float m[]; };
-layout (std430, set = 0, binding = 3) buffer Movable { float mov[]; };
-
-layout (std140, set = 2, binding = 0) uniform Constants {
-    uint count;
-    float G;
-    float ee;
-    float dt;
-};
-
-uint when_neq(uint i, uint self) {
-    return uint (i != self);
-}
+#include "../lib/conditionals.lib.glsl"
 
 vec2 gravity(uint self, vec2 r_self) {
     vec2 net_a = vec2(0.0);

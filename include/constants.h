@@ -29,7 +29,7 @@
 
 // fixed (change is shaders as well)
 #define TRAIL_LENGTH 512
-#define PREDICTIONS_LENGTH 2048
+#define PREDICTION_LENGTH 2048
 
 #endif
 

@@ -17,23 +17,23 @@ i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
     sim->euler_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/euler.comp.spv");
     sim->verlet_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/verlet.comp.spv");
     sim->rk4_pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation/rk4.comp.spv"); // TODO: change to rk4
-    if (!sim->euler_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create euler compute pipeline!");
-    if (!sim->verlet_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create verlet compute pipeline!");
-    if (!sim->rk4_pipeline) return panic("CreateGPUComputePipeline() in simulation_init()", "Failed to create rk4 compute pipeline!");
+    if (!sim->euler_pipeline) panic("Failed to create euler compute pipeline!");
+    if (!sim->verlet_pipeline) panic("Failed to create verlet compute pipeline!");
+    if (!sim->rk4_pipeline) panic("Failed to create rk4 compute pipeline!");
 
     sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     sim->masses = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     sim->movable = CreateGPUArray(gpu, sizeof(f32), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    if (!sim->positions.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation position buffer!");
-    if (!sim->velocities.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation velocities buffer!");
-    if (!sim->masses.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation masses buffer!");
-    if (!sim->movable.buffer) return panic("CreateGPUArray() in simulation_init()", "Failed to create simulation movable buffer!");
+    if (!sim->positions.buffer) panic("Failed to create simulation position buffer!");
+    if (!sim->velocities.buffer) panic("Failed to create simulation velocities buffer!");
+    if (!sim->masses.buffer) panic("Failed to create simulation masses buffer!");
+    if (!sim->movable.buffer) panic("Failed to create simulation movable buffer!");
 
     return SDL_APP_CONTINUE;
 }
 
-usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body) {
+u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body) {
     const AppendGPUArrayBinding bindings[] = {
         { .array = &sim->positions, .source = (u8 *) &body->position, .size = sizeof(HMM_Vec2) },
         { .array = &sim->velocities, .source = (u8 *) &body->velocity, .size = sizeof(HMM_Vec2) },
@@ -50,7 +50,7 @@ usize simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationA
     return sim->body_count++;
 }
 
-void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delta_time) {
+void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delta_time) {
     if (sim->options.paused) return;
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
@@ -64,7 +64,7 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delt
         sim->body_count,
         sim->options.gravity,
         sim->options.softening,
-        (f32) delta_time
+        delta_time
     };
 
     SDL_PushGPUComputeUniformData(command_buffer, 0, &constants, sizeof(constants));
@@ -80,6 +80,7 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delt
         buffer_bindings, sizeof(buffer_bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
     );
 
+    // TODO: i don't think putting these all into one shader would too bad
     SDL_GPUComputePipeline *integrator_pipeline = NULL;
     switch (sim->options.integrator) {
         case INTEGRATOR_EULER:
@@ -94,16 +95,10 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f64 delt
     }
 
     SDL_BindGPUComputePipeline(compute_pass, integrator_pipeline);
-
-    SDL_GPUBuffer *buffers[] = {
-        sim->positions.buffer,
-        sim->velocities.buffer,
-        sim->masses.buffer,
-        sim->movable.buffer,
-    };
-
+    SDL_GPUBuffer *buffers[] = { sim->positions.buffer, sim->velocities.buffer, sim->masses.buffer, sim->movable.buffer, };
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
+
     SDL_EndGPUComputePass(compute_pass);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 }

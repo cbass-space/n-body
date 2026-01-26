@@ -7,10 +7,10 @@
 typedef struct Simulation Simulation;
 
 typedef struct Trails {
-    u32 body_count;
-    u32 frame;
     SDL_GPUComputePipeline *pipeline;
     GPUArray array;
+    u32 body_count;
+    u32 frame;
 } Trails;
 
 i32 trails_init(Trails *trails, SDL_GPUDevice *gpu);
