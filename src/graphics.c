@@ -98,7 +98,7 @@ static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim,
 static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_GPURenderPass *render_pass);
 static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, SDL_GPURenderPass *render_pass);
 // static void graphics_ghost_draw(const Graphics *gfx, const Ghost *ghost, SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass);
-// static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain);
+static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain);
 
 void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(info->gpu);
@@ -169,7 +169,7 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     // graphics_predictions_draw(gfx, render_pass, info->predictions->enabled, info->ghost->enabled);
     SDL_EndGPURenderPass(render_pass);
 
-    // graphics_gui_draw(command_buffer, swapchain);
+    graphics_gui_draw(command_buffer, swapchain);
     SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
@@ -305,6 +305,7 @@ static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_
 }
 
 static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, SDL_GPURenderPass *render_pass) {
+    if (!trajectories->enabled) return;
     SDL_BindGPUGraphicsPipeline(render_pass, gfx->trajectory_pipeline);
     SDL_GPUBuffer *buffers[] = { trajectories->positions.buffer, gfx->colors.buffer };
     SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
@@ -366,20 +367,20 @@ static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *
 //     }
 // }
 //
-// static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain) {
-//     ImDrawData *draw_data = ImGui_GetDrawData();
-//     cImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
-//     SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &(SDL_GPUColorTargetInfo) {
-//         .texture = swapchain,
-//         .load_op =  SDL_GPU_LOADOP_LOAD,
-//         .store_op = SDL_GPU_STOREOP_STORE
-//     }, 1, NULL);
-//
-//     cImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
-//     ImGui_UpdatePlatformWindows();
-//     ImGui_RenderPlatformWindowsDefault();
-//     SDL_EndGPURenderPass(render_pass);
-// }
+static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain) {
+    ImDrawData *draw_data = ImGui_GetDrawData();
+    cImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+    SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &(SDL_GPUColorTargetInfo) {
+        .texture = swapchain,
+        .load_op =  SDL_GPU_LOADOP_LOAD,
+        .store_op = SDL_GPU_STOREOP_STORE
+    }, 1, NULL);
+
+    cImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+    ImGui_UpdatePlatformWindows();
+    ImGui_RenderPlatformWindowsDefault();
+    SDL_EndGPURenderPass(render_pass);
+}
 
 void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu) {
     SDL_ReleaseGPUGraphicsPipeline(gpu, gfx->body_pipeline);

@@ -5,7 +5,7 @@
 // #include "camera.h"
 // #include "ghost.h"
 #include "graphics.h"
-// #include "gui.h"
+#include "gui.h"
 
 #define SDL_MAIN_USE_CALLBACKS
 #include "SDL3/SDL_main.h"
@@ -18,10 +18,6 @@
 #define UNUSED(x) (void)(x)
 
 typedef struct {
-    f32 fixed_delta_time;
-} ApplicationOptions;
-
-typedef struct {
     ApplicationOptions options;
     SDL_Window *window;
     SDL_GPUDevice *gpu;
@@ -31,7 +27,7 @@ typedef struct {
     // Camera cam;
     // Ghost ghost;
     Graphics gfx;
-    // Gui gui;
+    Gui gui;
 } Application;
 
 static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color);
@@ -64,10 +60,10 @@ SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     if (trails_init(&app->trails, app->gpu) != 0) panic("Failed to initialize trail module!");
     if (trajectories_init(&app->trajectories, app->gpu) != 0) panic("Failed to initialize trajectory module!");
     if (graphics_init(&app->gfx, app->gpu, app->window) != 0) panic("Failed to initialize graphics!");
+    if (gui_init(&app->gui, app->window, app->gpu) != 0) panic("Failed to initialize GUI!");
 
     // camera_init(&app->cam);
     // ghost_init(&app->ghost);
-    // if (gui_init(&app->gui, app->window, app->gpu) != 0) return panic("gui_init() in app_init()", "Failed to initialize GUI!");
 
     add_body(app, &(SimulationAddBodyInfo) {
         .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
@@ -115,14 +111,14 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 
     // ghost_update(&app->ghost, app->window, &app->sim, &app->cam);
 
-    // gui_update(&(GuiUpdateInfo) {
-    //     .app = &app->options,
-    //     .sim = &app->sim,
-    //     .cam = &app->cam,
-    //     .ghost = &app->ghost,
-    //     .predictions = &app->predictions,
-    //     .gfx = &app->gfx,
-    // });
+    gui_update(&(GuiUpdateInfo) {
+        .app = &app->options,
+        .sim = &app->sim,
+        .trajectories = &app->trajectories,
+        // .cam = &app->cam,
+        // .ghost = &app->ghost,
+        .gfx = &app->gfx,
+    });
 
     graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
         .gpu = app->gpu,

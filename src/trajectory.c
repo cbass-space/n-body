@@ -15,6 +15,7 @@ i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
     if (!trajectories->positions.buffer) panic("Failed to create trajectory buffer!");
     if (!trajectories->velocities.buffer) panic("Failed to create trajectory buffer!");
 
+    trajectories->enabled = true;
     return SDL_APP_CONTINUE;
 }
 
@@ -39,6 +40,7 @@ u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, const 
 }
 
 void trajectories_update(const Trajectories *trajectories, SDL_GPUDevice *gpu, const Simulation * sim, f32 delta_time) {
+    if (!trajectories->enabled) return;
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
 
     const struct {

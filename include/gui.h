@@ -3,8 +3,8 @@
 
 typedef struct Simulation Simulation;
 typedef struct Camera Camera;
-typedef struct Ghost Ghost;
-typedef struct Predictions Predictions;
+// typedef struct Ghost Ghost;
+typedef struct Trajectories Trajectories;
 typedef struct Graphics Graphics;
 
 #include "SDL3/SDL.h"
@@ -25,8 +25,8 @@ typedef struct {
     ApplicationOptions *app;
     Simulation *sim;
     Camera *cam;
-    Ghost *ghost;
-    Predictions *predictions;
+    // Ghost *ghost;
+    Trajectories *trajectories;
     Graphics *gfx;
 } GuiUpdateInfo;
 void gui_update(const GuiUpdateInfo *info);

@@ -21,7 +21,7 @@ add_executable(${PROJECT_NAME} WIN32
 #    src/camera.c
 #    src/ghost.c
     src/graphics.c
-#    src/gui.c
+    src/gui.c
 
     include/constants.h
     include/simulation.h
@@ -30,7 +30,7 @@ add_executable(${PROJECT_NAME} WIN32
 #    include/camera.h
 #    include/ghost.h
     include/graphics.h
-        #    include/gui.h
+    include/gui.h
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE lib include)

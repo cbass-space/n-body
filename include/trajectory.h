@@ -11,6 +11,7 @@ typedef struct Trajectories {
     GPUArray positions;
     GPUArray velocities;
     u32 body_count;
+    bool enabled;
 } Trajectories;
 
 i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu);

@@ -1,8 +1,8 @@
 #include "gui.h"
 #include "simulation.h"
 #include "camera.h"
-#include "ghost.h"
-#include "prediction.h"
+// #include "ghost.h"
+#include "trajectory.h"
 #include "graphics.h"
 
 #include "stb_ds.h"
@@ -39,74 +39,74 @@ i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
 }
 
 static void HelpMarker(const char *desc);
-static void gui_create_body(Ghost *ghost);
-static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam);
-static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Predictions *predictions, GraphicsOptions *gfx);
+// static void gui_create_body(Ghost *ghost);
+// static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam);
+static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Trajectories *trajectories, GraphicsOptions *gfx);
 void gui_update(const GuiUpdateInfo *info) {
     cImGui_ImplSDLGPU3_NewFrame();
     cImGui_ImplSDL3_NewFrame();
     ImGui_NewFrame();
     ImGui_Begin("N-Body Simulator", NULL, ImGuiWindowFlags_AlwaysAutoResize);
 
-    gui_create_body(info->ghost);
-    gui_inspector(info->sim, info->gfx, info->cam);
-    gui_controls(info->app, &info->sim->options, info->predictions, &info->gfx->options);
+    // gui_create_body(info->ghost);
+    // gui_inspector(info->sim, info->gfx, info->cam);
+    gui_controls(info->app, &info->sim->options, info->trajectories, &info->gfx->options);
 
     ImGui_End();
     ImGui_Render();
 }
 
-static void gui_create_body(Ghost *ghost) {
-    if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui_Checkbox("Body creation mode!", &ghost->enabled);
-        HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
-        ImGui_BeginDisabled(!ghost->enabled);
-        ImGui_DragFloat("Mass", &ghost->mass);
-        HelpMarker("The mass of the new body.");
-        ImGui_ColorEdit3("Color", (f32 *) &ghost->color, 0);
-        HelpMarker("The color of the new body.");
-        ImGui_Checkbox("Movable", &ghost->movable);
-        HelpMarker("Whether the body should be simulated or remain in place.");
-        ImGui_EndDisabled();
-    }
-}
+// static void gui_create_body(Ghost *ghost) {
+//     if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
+//         ImGui_Checkbox("Body creation mode!", &ghost->enabled);
+//         HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
+//         ImGui_BeginDisabled(!ghost->enabled);
+//         ImGui_DragFloat("Mass", &ghost->mass);
+//         HelpMarker("The mass of the new body.");
+//         ImGui_ColorEdit3("Color", (f32 *) &ghost->color, 0);
+//         HelpMarker("The color of the new body.");
+//         ImGui_Checkbox("Movable", &ghost->movable);
+//         HelpMarker("Whether the body should be simulated or remain in place.");
+//         ImGui_EndDisabled();
+//     }
+// }
 
-static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam) {
-    if (ImGui_CollapsingHeader("Simulation Inspector", 0)) {
-        ImGui_SeparatorText("Edit Bodies");
-        for (usize i = 0; i < sim->body_count; i++) {
-            ImGui_PushIDInt((i32) i);
-            if (ImGui_TreeNodeExStr("", 0, "Body %d", (i32) i)) {
-                if (ImGui_ColorEdit3("Color", (f32 *) &gfx->colors[i], 0)) gfx->dirty_flag = (GraphicsDirtyFlag) {
-                    .type = DIRTY_COLOR,
-                    .index = i,
-                    .color = gfx->colors[i]
-                };
-
-                if (ImGui_DragFloat("Mass", &sim->masses[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
-                    .type = DIRTY_MASS,
-                    .index = i,
-                    .mass = sim->masses[i]
-                };
-
-                ImGui_DragFloat2("Position", (f32 *) &sim->positions[i]);
-                ImGui_DragFloat2("Velocity", (f32 *) &sim->velocities[i]);
-
-                if (ImGui_Checkbox("Movable", &sim->movable[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
-                    .type = DIRTY_MOVABLE,
-                    .index = i,
-                    .movable = sim->movable[i]
-                };
-
-                if (ImGui_Button("Follow Body")) cam->target = i;
-                ImGui_TreePop();
-            }
-            ImGui_PopID();
-        }
-    }
-
-}
-static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Predictions *predictions, GraphicsOptions *gfx) {
+// static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam) {
+//     if (ImGui_CollapsingHeader("Simulation Inspector", 0)) {
+//         ImGui_SeparatorText("Edit Bodies");
+//         for (usize i = 0; i < sim->body_count; i++) {
+//             ImGui_PushIDInt((i32) i);
+//             if (ImGui_TreeNodeExStr("", 0, "Body %d", (i32) i)) {
+//                 if (ImGui_ColorEdit3("Color", (f32 *) &gfx->colors[i], 0)) gfx->dirty_flag = (GraphicsDirtyFlag) {
+//                     .type = DIRTY_COLOR,
+//                     .index = i,
+//                     .color = gfx->colors[i]
+//                 };
+//
+//                 if (ImGui_DragFloat("Mass", &sim->masses[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
+//                     .type = DIRTY_MASS,
+//                     .index = i,
+//                     .mass = sim->masses[i]
+//                 };
+//
+//                 ImGui_DragFloat2("Position", (f32 *) &sim->positions[i]);
+//                 ImGui_DragFloat2("Velocity", (f32 *) &sim->velocities[i]);
+//
+//                 if (ImGui_Checkbox("Movable", &sim->movable[i])) gfx->dirty_flag = (GraphicsDirtyFlag) {
+//                     .type = DIRTY_MOVABLE,
+//                     .index = i,
+//                     .movable = sim->movable[i]
+//                 };
+//
+//                 if (ImGui_Button("Follow Body")) cam->target = i;
+//                 ImGui_TreePop();
+//             }
+//             ImGui_PopID();
+//         }
+//     }
+//
+// }
+static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Trajectories *trajectories, GraphicsOptions *gfx) {
     if (ImGui_CollapsingHeader("Controls and Options", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui_SeparatorText("Controls");
         ImGui_Checkbox("Pause Simulation", &sim->paused);
@@ -123,10 +123,10 @@ static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Predic
         const char *integrators[] = { "Semi-Implicit Euler", "Velocity Verlet", "Runge-Kutta 4" };
         ImGui_ComboChar("Integrator", (i32 *) &sim->integrator, integrators, IM_COUNTOF(integrators));
         HelpMarker("The algorithm used to calculate the new velocity and position of each body given the acceleration. Euler is the most performant, Verlet is more accurate while still conserving energy, and RK4 is the most accurate across short time spans but does not conserve energy.");
-        ImGui_Checkbox("Collisions", &sim->collide);
-        HelpMarker("Whether to handle body collisions (expensive compute!)");
+        // ImGui_Checkbox("Collisions", &sim->collide);
+        // HelpMarker("Whether to handle body collisions (expensive compute!)");
 
-        ImGui_Checkbox("Predict Body Motion", &predictions->enabled);
+        ImGui_Checkbox("Predict Body Motion", &trajectories->enabled);
         HelpMarker("Simulate planets into the future and draw their trajectories (expensive compute!)");
 
         ImGui_SeparatorText("Drawing Options");
