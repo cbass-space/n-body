@@ -29,7 +29,7 @@ i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
     return SDL_APP_CONTINUE;
 }
 
-u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body) {
+u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const SimulationAddBodyInfo *body) {
     const AppendGPUArrayBinding bindings[] = {
         { .array = &sim->positions, .source = (u8 *) &body->position, .size = sizeof(HMM_Vec2) },
         { .array = &sim->velocities, .source = (u8 *) &body->velocity, .size = sizeof(HMM_Vec2) },
@@ -37,12 +37,7 @@ u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAdd
         { .array = &sim->movable, .source = (u8 *) &(f32) { body->movable }, .size = sizeof(f32) },
     };
 
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     AppendGPUArrays(gpu, copy_pass, bindings, sizeof(bindings) / sizeof(AppendGPUArrayBinding));
-    SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
-
     return sim->body_count++;
 }
 

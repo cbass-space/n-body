@@ -57,7 +57,7 @@ typedef struct {
     SDL_FColor color;
 } GraphicsAddBodyInfo;
 
-u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_FColor *color);
+u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, SDL_FColor *color);
 typedef struct {
     SDL_GPUDevice *gpu;
     SDL_Window *window;

@@ -133,13 +133,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     return SDL_APP_CONTINUE;
 }
 
-static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color) {
-    simulation_add_body(&app->sim, app->gpu, sim_info);
-    trails_add_body(&app->trails, app->gpu, sim_info->position);
-    trajectories_add_body(&app->trajectories, app->gpu, sim_info->position);
-    graphics_add_body(&app->gfx, app->gpu, color);
-}
-
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     // Application *app = appstate;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
@@ -172,6 +165,19 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     // }
 
     return SDL_APP_CONTINUE;
+}
+
+static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color) {
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+
+    simulation_add_body(&app->sim, app->gpu, copy_pass, sim_info);
+    trails_add_body(&app->trails, app->gpu, copy_pass, sim_info->position);
+    trajectories_add_body(&app->trajectories, app->gpu, copy_pass, sim_info->position);
+    graphics_add_body(&app->gfx, app->gpu, copy_pass, color);
+
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
 void SDL_AppQuit(void *appstate, const SDL_AppResult result) {

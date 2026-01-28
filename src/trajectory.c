@@ -19,13 +19,9 @@ i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
     return SDL_APP_CONTINUE;
 }
 
-u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, const HMM_Vec2 position) {
+u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const HMM_Vec2 position) {
     HMM_Vec2 trajectory[PREDICTION_LENGTH];
     for (usize i = 0; i < PREDICTION_LENGTH; i++) trajectory[i] = position;
-
-    // TODO: shared command buffer across "add_body" and "update" functions
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     const AppendGPUArrayBinding bindings[] = {
         { .array = &trajectories->positions, .source = (u8 *) &trajectory, .size = PREDICTION_SIZE },
@@ -33,9 +29,6 @@ u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, const 
     };
 
     AppendGPUArrays(gpu, copy_pass, bindings, sizeof(bindings) / sizeof(AppendGPUArrayBinding));
-
-    SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
     return trajectories->body_count++;
 }
 

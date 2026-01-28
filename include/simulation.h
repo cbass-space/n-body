@@ -39,7 +39,7 @@ typedef struct {
     bool movable;
 } SimulationAddBodyInfo;
 
-u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, const SimulationAddBodyInfo *body);
+u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const SimulationAddBodyInfo *body);
 void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, f32 delta_time);
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu);
 

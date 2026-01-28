@@ -15,7 +15,7 @@ typedef struct Trajectories {
 } Trajectories;
 
 i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu);
-u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, HMM_Vec2 position);
+u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, HMM_Vec2 position);
 void trajectories_update(const Trajectories *trajectories, SDL_GPUDevice *gpu, const Simulation * sim, f32 delta_time);
 void trajectories_free(const Trajectories *trajectories, SDL_GPUDevice *gpu);
 

@@ -74,17 +74,13 @@ i32 graphics_init(Graphics *gfx, SDL_GPUDevice *gpu, SDL_Window *window) {
     return SDL_APP_CONTINUE;
 }
 
-u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_FColor *color) {
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, SDL_FColor *color) {
     AppendGPUArrays(gpu, copy_pass, &(AppendGPUArrayBinding) {
         .array = &gfx->colors,
         .source = (u8 *) color,
         .size = sizeof(SDL_FColor)
     }, 1);
 
-    SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
     return gfx->body_count++;
 }
 

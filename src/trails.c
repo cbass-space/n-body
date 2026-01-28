@@ -12,13 +12,9 @@ i32 trails_init(Trails *trails, SDL_GPUDevice *gpu) {
     return SDL_APP_CONTINUE;
 }
 
-u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, const HMM_Vec2 position) {
+u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const HMM_Vec2 position) {
     HMM_Vec2 trail[TRAIL_LENGTH];
     for (usize i = 0; i < TRAIL_LENGTH; i++) trail[i] = position;
-
-    // TODO: shared command buffer across "add_body" and "update" functions
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
     AppendGPUArrays(gpu, copy_pass, &(AppendGPUArrayBinding) {
         .array = &trails->array,
@@ -26,8 +22,6 @@ u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, const HMM_Vec2 position)
         .size = TRAIL_SIZE
     }, 1);
 
-    SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
     return trails->body_count++;
 }
 
