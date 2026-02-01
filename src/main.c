@@ -30,10 +30,9 @@ typedef struct {
     Gui gui;
 } Application;
 
-static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color);
+static void add_body(Application *app, SDL_GPUCopyPass *copy_pass, const SimulationAddBodyInfo *sim_info, SDL_FColor *color);
 SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     UNUSED(argc); UNUSED(argv);
-
     Application *app = SDL_calloc(1, sizeof(*app));
     *appstate = app;
     app->options = (ApplicationOptions) { .fixed_delta_time = FIXED_DELTA_TIME_DEFAULT };
@@ -65,27 +64,33 @@ SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     // camera_init(&app->cam);
     // ghost_init(&app->ghost);
 
-    add_body(app, &(SimulationAddBodyInfo) {
-        .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
-        .velocity = (HMM_Vec2) { .X = -25.0f, .Y = 0.0f },
-        .mass = 50.0f,
-        .movable = true,
-    }, &(SDL_FColor) { 1.0f, 0.0f, 1.0f, 1.0f });
 
-    add_body(app, &(SimulationAddBodyInfo) {
-        .position = (HMM_Vec2) { .X = 0.0f, .Y = 100.0f },
-        .velocity = (HMM_Vec2) { .X = 25.0f, .Y = 0.0f },
-        .mass = 50.0f,
-        .movable = true,
-    }, &(SDL_FColor) { 0.0f, 1.0f, 1.0f, 1.0f });
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
+    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
 
-    add_body(app, &(SimulationAddBodyInfo) {
-        .position = (HMM_Vec2) { .X = 100.0f, .Y = 0.0f },
-        .velocity = (HMM_Vec2) { .Y = 10.0f },
-        .mass = 50.0f,
-        .movable = true,
-    }, &(SDL_FColor) { 1.0f, 1.0f, 0.0f, 1.0f });
+    add_body(app, copy_pass, &(SimulationAddBodyInfo) {
+         .position = (HMM_Vec2) { .X = 0.0f, .Y = -100.0f },
+         .velocity = (HMM_Vec2) { .X = -25.0f, .Y = 0.0f },
+         .mass = 50.0f,
+         .movable = true,
+     }, &(SDL_FColor) { 1.0f, 0.0f, 1.0f, 1.0f });
 
+    add_body(app, copy_pass, &(SimulationAddBodyInfo) {
+         .position = (HMM_Vec2) { .X = 0.0f, .Y = 100.0f },
+         .velocity = (HMM_Vec2) { .X = 25.0f, .Y = 0.0f },
+         .mass = 50.0f,
+         .movable = true,
+     }, &(SDL_FColor) { 0.0f, 1.0f, 1.0f, 1.0f });
+
+    add_body(app, copy_pass, &(SimulationAddBodyInfo) {
+         .position = (HMM_Vec2) { .X = 100.0f, .Y = 0.0f },
+         .velocity = (HMM_Vec2) { .Y = 10.0f },
+         .mass = 50.0f,
+         .movable = true,
+     }, &(SDL_FColor) { 1.0f, 1.0f, 0.0f, 1.0f });
+
+    SDL_EndGPUCopyPass(copy_pass);
+    SDL_SubmitGPUCommandBuffer(command_buffer);
     return SDL_APP_CONTINUE;
 }
 
@@ -99,15 +104,41 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     const f32 delta_time = (f32)(current_tick - last_tick) / (f32) SDL_NS_PER_SECOND;
     last_tick = current_tick;
 
+    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
+    const SDL_GPUStorageBufferReadWriteBinding bindings[] = {
+        { .buffer = app->sim.positions.buffer, .cycle = false },
+        { .buffer = app->sim.velocities.buffer, .cycle = false },
+        { .buffer = app->trails.array.buffer, .cycle = false },
+        { .buffer = app->trajectories.positions.buffer, .cycle = false },
+        { .buffer = app->trajectories.velocities.buffer, .cycle = false },
+    };
+
+    SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(
+        command_buffer,
+        NULL, 0,
+        bindings, sizeof(bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
+    );
+
+
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
-        simulation_update(&app->sim, app->gpu, app->options.fixed_delta_time);
-        trails_update(&app->trails, app->gpu, &app->sim);
-        trajectories_update(&app->trajectories, app->gpu, &app->sim, app->options.fixed_delta_time);
-        // prediction_update(&app->predictions, &app->sim, &app->ghost, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
+        simulation_update(&app->sim, command_buffer, compute_pass, app->options.fixed_delta_time);
+        trails_update(&app->trails, command_buffer, compute_pass, &app->sim);
+
+        // TrajectoryUpdateInfo info = {
+        //     .command_buffer = command_buffer,
+        //     .compute_pass = compute_pass,
+        //     .sim = &app->sim,
+        //     .delta_time = delta_time
+        // };
+        // FIXME: why does changing this to use &info break everything?
+        trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
+
         // camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
     }
+
+    SDL_EndGPUComputePass(compute_pass);
 
     // ghost_update(&app->ghost, app->window, &app->sim, &app->cam);
 
@@ -121,8 +152,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     });
 
     graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
-        .gpu = app->gpu,
         .window = app->window,
+        .gpu = app->gpu,
+        .command_buffer = command_buffer,
         .sim = &app->sim,
         .trails = &app->trails,
         .trajectories = &app->trajectories
@@ -130,14 +162,15 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         // .ghost = &app->ghost,
     });
 
+    SDL_SubmitGPUCommandBuffer(command_buffer);
+
     return SDL_APP_CONTINUE;
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     // Application *app = appstate;
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
-
-    // gui_event(event);
+    gui_event(event);
 
     // if (!app->gui.io->WantCaptureMouse) {
     //     camera_mouse(&app->cam, event, app->window, app->ghost.enabled);
@@ -167,23 +200,16 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     return SDL_APP_CONTINUE;
 }
 
-static void add_body(Application *app, const SimulationAddBodyInfo *sim_info, SDL_FColor *color) {
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
-    SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-
+static void add_body(Application *app, SDL_GPUCopyPass *copy_pass, const SimulationAddBodyInfo *sim_info, SDL_FColor *color) {
     simulation_add_body(&app->sim, app->gpu, copy_pass, sim_info);
     trails_add_body(&app->trails, app->gpu, copy_pass, sim_info->position);
     trajectories_add_body(&app->trajectories, app->gpu, copy_pass, sim_info->position);
     graphics_add_body(&app->gfx, app->gpu, copy_pass, color);
-
-    SDL_EndGPUCopyPass(copy_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
 void SDL_AppQuit(void *appstate, const SDL_AppResult result) {
     UNUSED(result);
-
-    Application *app = appstate;
+    const Application *app = appstate;
 
     SDL_WaitForGPUIdle(app->gpu);
     SDL_ReleaseWindowFromGPUDevice(app->gpu, app->window);

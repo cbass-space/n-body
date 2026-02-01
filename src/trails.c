@@ -25,29 +25,15 @@ u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pa
     return trails->body_count++;
 }
 
-void trails_update(Trails *trails, SDL_GPUDevice *gpu, const Simulation *sim) {
+void trails_update(Trails *trails, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim) {
     if (sim->options.paused) return;
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
-
     trails->frame = (trails->frame + 1) % TRAIL_LENGTH;
     SDL_PushGPUComputeUniformData(command_buffer, 0, &trails->frame, sizeof(u32));
-
-    SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(
-        command_buffer,
-        NULL, 0,
-        &(SDL_GPUStorageBufferReadWriteBinding) {
-            .buffer = trails->array.buffer,
-            .cycle = false
-        }, 1
-    );
 
     SDL_BindGPUComputePipeline(compute_pass, trails->pipeline);
     SDL_GPUBuffer *buffers[] = { trails->array.buffer, sim->positions.buffer };
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, 2);
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
-
-    SDL_EndGPUComputePass(compute_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
 void trails_free(const Trails *trails, SDL_GPUDevice *gpu) {

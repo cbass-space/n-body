@@ -16,7 +16,7 @@ typedef struct Trails {
 i32 trails_init(Trails *trails, SDL_GPUDevice *gpu);
 
 u32 trails_add_body(Trails *trails, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, HMM_Vec2 position);
-void trails_update(Trails *trails, SDL_GPUDevice *gpu, const Simulation *sim);
+void trails_update(Trails *trails, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim);
 void trails_free(const Trails *trails, SDL_GPUDevice *gpu);
 
 #endif

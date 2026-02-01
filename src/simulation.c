@@ -41,10 +41,8 @@ u32 simulation_add_body(Simulation *sim, SDL_GPUDevice *gpu, SDL_GPUCopyPass *co
     return sim->body_count++;
 }
 
-void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delta_time) {
+void simulation_update(const Simulation *sim, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const f32 delta_time) {
     if (sim->options.paused) return;
-
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(gpu);
 
     const struct {
         u32 body_count;
@@ -62,24 +60,10 @@ void simulation_update(const Simulation *sim, SDL_GPUDevice *gpu, const f32 delt
 
     SDL_PushGPUComputeUniformData(command_buffer, 0, &constants, sizeof(constants));
 
-    const SDL_GPUStorageBufferReadWriteBinding buffer_bindings[] = {
-        { .buffer = sim->positions.buffer, .cycle = false },
-        { .buffer = sim->velocities.buffer, .cycle = false },
-    };
-
-    SDL_GPUComputePass *compute_pass = SDL_BeginGPUComputePass(
-        command_buffer,
-        NULL, 0,
-        buffer_bindings, sizeof(buffer_bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
-    );
-
     SDL_BindGPUComputePipeline(compute_pass, sim->pipeline);
     SDL_GPUBuffer *buffers[] = { sim->positions.buffer, sim->velocities.buffer, sim->masses.buffer, sim->movable.buffer, };
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
-
-    SDL_EndGPUComputePass(compute_pass);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
 }
 
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu) {

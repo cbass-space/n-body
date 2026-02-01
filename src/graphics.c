@@ -97,11 +97,10 @@ static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *
 static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain);
 
 void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
-    SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(info->gpu);
     SDL_GPUTexture *swapchain;
-    SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, info->window, &swapchain, NULL, NULL);
+    SDL_WaitAndAcquireGPUSwapchainTexture(info->command_buffer, info->window, &swapchain, NULL, NULL);
     if (!swapchain) {
-        SDL_SubmitGPUCommandBuffer(command_buffer);
+        SDL_SubmitGPUCommandBuffer(info->command_buffer);
         return;
     }
 
@@ -122,7 +121,7 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     );
 
     const HMM_Mat4 matrices[] = { orthographic, view };
-    SDL_PushGPUVertexUniformData(command_buffer, 0, &matrices, sizeof(matrices));
+    SDL_PushGPUVertexUniformData(info->command_buffer, 0, &matrices, sizeof(matrices));
 
     const struct {
         f32 density;
@@ -140,7 +139,7 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
         // camera_target
     };
 
-    SDL_PushGPUVertexUniformData(command_buffer, 1, &constants, sizeof(constants));
+    SDL_PushGPUVertexUniformData(info->command_buffer, 1, &constants, sizeof(constants));
 
     // graphics_uniform_matrices(info->window, command_buffer, info->cam, 0);
     // graphics_uniform_constants(gfx, command_buffer, &info->sim->options, info->cam, 1);
@@ -151,7 +150,7 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     // graphics_predictions_update(gfx, info->predictions, info->gpu, copy_pass, info->ghost->enabled);
     // SDL_EndGPUCopyPass(copy_pass);
 
-    SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(command_buffer, &(SDL_GPUColorTargetInfo) {
+    SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(info->command_buffer, &(SDL_GPUColorTargetInfo) {
         .clear_color = gfx->options.clear_color,
         .load_op = SDL_GPU_LOADOP_CLEAR,
         .store_op = SDL_GPU_STOREOP_STORE,
@@ -165,8 +164,7 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     // graphics_predictions_draw(gfx, render_pass, info->predictions->enabled, info->ghost->enabled);
     SDL_EndGPURenderPass(render_pass);
 
-    graphics_gui_draw(command_buffer, swapchain);
-    SDL_SubmitGPUCommandBuffer(command_buffer);
+    graphics_gui_draw(info->command_buffer, swapchain);
 }
 
 // static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass) {

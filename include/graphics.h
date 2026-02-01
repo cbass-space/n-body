@@ -59,8 +59,9 @@ typedef struct {
 
 u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, SDL_FColor *color);
 typedef struct {
-    SDL_GPUDevice *gpu;
     SDL_Window *window;
+    SDL_GPUDevice *gpu;
+    SDL_GPUCommandBuffer *command_buffer;
     const Simulation *sim;
     const Trails *trails;
     const Trajectories *trajectories;
