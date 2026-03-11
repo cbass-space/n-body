@@ -125,12 +125,6 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         simulation_update(&app->sim, command_buffer, compute_pass, app->options.fixed_delta_time);
         trails_update(&app->trails, command_buffer, compute_pass, &app->sim);
 
-        // TrajectoryUpdateInfo info = {
-        //     .command_buffer = command_buffer,
-        //     .compute_pass = compute_pass,
-        //     .sim = &app->sim,
-        //     .delta_time = delta_time
-        // };
         // FIXME: why does changing this to use &info break everything?
         trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
 
