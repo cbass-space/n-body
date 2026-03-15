@@ -9,7 +9,7 @@
 typedef struct Simulation Simulation;
 typedef struct Trails Trails;
 typedef struct Trajectories Trajectories;
-// typedef struct Camera Camera;
+typedef struct Camera Camera;
 // typedef struct Ghost Ghost;
 
 // typedef struct {
@@ -65,7 +65,7 @@ typedef struct {
     const Simulation *sim;
     const Trails *trails;
     const Trajectories *trajectories;
-    // const Camera *cam;
+    const Camera *cam;
     // const Ghost *ghost;
 } GraphicsDrawInfo;
 void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info);

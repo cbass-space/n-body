@@ -48,6 +48,7 @@ void main() {
             v[i] += gravity(i, r[i]) * dt * mov[i];
             r[i] += v[i] * dt * mov[i];
             break;
+
         case VERLET:
             // https://en.wikipedia.org/wiki/Verlet_integration#Velocity_Verlet
             vec2 a = gravity(i, r[i]);
@@ -55,6 +56,7 @@ void main() {
             vec2 a_next = gravity(i, r[i]);
             v[i] += (a + a_next) * (dt / 2);
             break;
+
         case RK4:
             // https://en.wikipedia.org/wiki/Runge–Kutta_methods
             State y = State(r[i], v[i]);

@@ -12,13 +12,12 @@ layout (std430, set = 0, binding = 0) readonly buffer Positions { vec2 positions
 layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
 layout (std430, set = 0, binding = 2) readonly buffer Masses { float masses[]; };
 layout (std430, set = 0, binding = 3) readonly buffer Movables { float movable[]; };
-
-layout (std140, set = 1, binding = 0) uniform Transform {
+layout (std430, set = 0, binding = 4) readonly buffer Camera {
     mat4 orthographic;
     mat4 view;
 };
 
-layout (std140, set = 1, binding = 1) uniform Constants {
+layout (std140, set = 1, binding = 0) uniform Constants {
     float density;
     float movable_outline;
     float static_outline;

@@ -3,7 +3,7 @@
 #include "simulation.h"
 #include "trails.h"
 #include "trajectory.h"
-// #include "camera.h"
+#include "camera.h"
 // #include "ghost.h"
 
 #include "stb_ds.h"
@@ -85,14 +85,11 @@ u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_p
 }
 
 // static void graphics_dirty_update(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass);
-// static void graphics_simulation_update(const Graphics *gfx, const Simulation *sim, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass);
-// static void graphics_predictions_update(const Graphics *gfx, const Predictions *predictions, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, bool ghost_enabled);
-//
-// static void graphics_uniform_matrices(SDL_Window *window, SDL_GPUCommandBuffer *command_buffer, const Camera *cam, u32 slot);
-// static void graphics_uniform_constants(Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const SimulationOptions *sim, const Camera *cam, u32 slot);
-static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, SDL_GPURenderPass *render_pass);
-static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_GPURenderPass *render_pass);
-static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, SDL_GPURenderPass *render_pass);
+static void graphics_uniform_constants(const Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const SimulationOptions *sim, const Trails *trails, const u32 slot);
+
+static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, const Camera *cam, SDL_GPURenderPass *render_pass);
+static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, const Camera *cam, SDL_GPURenderPass *render_pass);
+static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, const Camera *cam, SDL_GPURenderPass *render_pass);
 // static void graphics_ghost_draw(const Graphics *gfx, const Ghost *ghost, SDL_GPUCommandBuffer *command_buffer, SDL_GPURenderPass *render_pass);
 static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain);
 
@@ -104,50 +101,10 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
         return;
     }
 
-    i32 width, height;
-    SDL_GetWindowSize(info->window, &width, &height);
-    const HMM_Mat4 orthographic = HMM_Orthographic_LH_ZO(
-        (f32) -width / 2.0f,
-        (f32) width / 2.0f,
-        (f32) -height / 2.0f,
-        (f32) height / 2.0f,
-        0.0f, 1.0f
-    );
-
-    const HMM_Mat4 view = HMM_LookAt_LH(
-        (HMM_Vec3) { .X = 0.0f, .Y = 0.0f, .Z = 0.0f },
-        (HMM_Vec3) { .X = 0.0f, .Y = 0.0f, .Z = 1.0f },
-        (HMM_Vec3) { .X = 0.0f, .Y = 1.0f, .Z = 0.0f }
-    );
-
-    const HMM_Mat4 matrices[] = { orthographic, view };
-    SDL_PushGPUVertexUniformData(info->command_buffer, 0, &matrices, sizeof(matrices));
-
-    const struct {
-        f32 density;
-        f32 movable_outline;
-        f32 static_outline;
-        u32 frame;
-        f32 trail_brightness;
-        // u32 camera_target;
-    } constants = {
-        info->sim->options.density,
-        gfx->options.movable_outline,
-        gfx->options.static_outline,
-        info->trails->frame,
-        gfx->options.trail_brightness,
-        // camera_target
-    };
-
-    SDL_PushGPUVertexUniformData(info->command_buffer, 1, &constants, sizeof(constants));
-
-    // graphics_uniform_matrices(info->window, command_buffer, info->cam, 0);
-    // graphics_uniform_constants(gfx, command_buffer, &info->sim->options, info->cam, 1);
+    graphics_uniform_constants(gfx, info->command_buffer, &info->sim->options, info->trails, 0);
 
     // SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     // graphics_dirty_update(gfx, info->gpu, copy_pass);
-    // graphics_simulation_update(gfx, info->sim, info->gpu, copy_pass);
-    // graphics_predictions_update(gfx, info->predictions, info->gpu, copy_pass, info->ghost->enabled);
     // SDL_EndGPUCopyPass(copy_pass);
 
     SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(info->command_buffer, &(SDL_GPUColorTargetInfo) {
@@ -157,11 +114,10 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
         .texture = swapchain
     }, 1, NULL);
 
-    graphics_simulation_draw(gfx, info->sim, render_pass);
-    graphics_trails_draw(gfx, info->trails, render_pass);
-    graphics_trajectories_draw(gfx, info->trajectories, render_pass);
+    graphics_simulation_draw(gfx, info->sim, info->cam, render_pass);
+    graphics_trails_draw(gfx, info->trails, info->cam, render_pass);
+    graphics_trajectories_draw(gfx, info->trajectories, info->cam, render_pass);
     // graphics_ghost_draw(gfx, info->ghost, command_buffer, render_pass);
-    // graphics_predictions_draw(gfx, render_pass, info->predictions->enabled, info->ghost->enabled);
     SDL_EndGPURenderPass(render_pass);
 
     graphics_gui_draw(info->command_buffer, swapchain);
@@ -205,79 +161,31 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
 //     WriteToGPUBuffers(gpu, copy_pass, &binding, 1);
 //     gfx->dirty_flag.type = DIRTY_NONE;
 // }
-//
-// static void graphics_uniform_matrices(SDL_Window *window, SDL_GPUCommandBuffer *command_buffer, const Camera *cam, u32 slot) {
-//     i32 width, height;
-//     SDL_GetWindowSize(window, &width, &height);
-//     const HMM_Mat4 orthographic = HMM_Orthographic_LH_ZO(
-//         cam->zoom * ((f32) -width / 2.0f),
-//         cam->zoom * ((f32) width / 2.0f),
-//         cam->zoom * ((f32) -height / 2.0f),
-//         cam->zoom * ((f32) height / 2.0f),
-//         0.0f, 1.0f
-//     );
-//
-//     const HMM_Mat4 view = HMM_LookAt_LH(
-//         (HMM_Vec3) { .X = cam->position.X, .Y = cam->position.Y, .Z = 0.0f },
-//         (HMM_Vec3) { .X = cam->position.X, .Y = cam->position.Y, .Z = 1.0f },
-//         (HMM_Vec3) { .X = 0.0f, .Y = 1.0f, .Z = 0.0f }
-//     );
-//
-//     const HMM_Mat4 matrices[] = { orthographic, view };
-//     SDL_PushGPUVertexUniformData(command_buffer, slot, &matrices, sizeof(matrices));
-// }
-//
-// static void graphics_uniform_constants(Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const SimulationOptions *sim, const Camera *cam, const u32 slot) {
-//     if (!sim->paused) gfx->trail_counter = (gfx->trail_counter + 1) % TRAIL_LENGTH;
-//     const u32 camera_target = cam->target == (usize) -1 ? (u32) -1 : cam->target;
-//
-//     const struct {
-//         f32 density;
-//         f32 movable_outline;
-//         f32 static_outline;
-//         u32 trail_counter;
-//         f32 trail_brightness;
-//         u32 camera_target;
-//     } constants = {
-//         sim->density,
-//         gfx->options.movable_outline,
-//         gfx->options.static_outline,
-//         gfx->trail_counter,
-//         gfx->options.trail_brightness,
-//         camera_target
-//     };
-//
-//     SDL_PushGPUVertexUniformData(command_buffer, slot, &constants, sizeof(constants));
-// }
-//
-// static void graphics_predictions_update(const Graphics *gfx, const Predictions *predictions, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, const bool ghost_enabled) {
-//     if (!predictions->enabled) return;
-//
-//     usize bindings_count = 0;
-//     WriteGPUBufferBinding bindings[2];
-//     if (arrlen(predictions->positions)) {
-//         bindings[bindings_count++] = (WriteGPUBufferBinding) {
-//             .buffer = gfx->gpu_predictions.buffer,
-//             .source = (u8 *) predictions->positions,
-//             .size = PREDICTION_SIZE * arrlenu(gfx->colors),
-//         };
-//     }
-//
-//     if (ghost_enabled) {
-//         bindings[bindings_count++]  = (WriteGPUBufferBinding) {
-//             .buffer = gfx->gpu_ghost_predictions,
-//             .source = (u8 *) predictions->ghost_positions,
-//             .size = PREDICTION_SIZE
-//         };
-//     }
-//
-//     WriteToGPUBuffers(gpu, copy_pass, bindings, bindings_count);
-// }
 
-static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, SDL_GPURenderPass *render_pass) {
+static void graphics_uniform_constants(const Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const SimulationOptions *sim, const Trails *trails, const u32 slot) {
+    const struct {
+        f32 density;
+        f32 movable_outline;
+        f32 static_outline;
+        u32 frame;
+        f32 trail_brightness;
+        // u32 camera_target;
+    } constants = {
+        sim->density,
+        gfx->options.movable_outline,
+        gfx->options.static_outline,
+        trails->frame,
+        gfx->options.trail_brightness,
+        // camera_target
+    };
+
+    SDL_PushGPUVertexUniformData(command_buffer, slot, &constants, sizeof(constants));
+}
+
+static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, const Camera *cam, SDL_GPURenderPass *render_pass) {
     if (!sim->body_count) return;
     SDL_BindGPUGraphicsPipeline(render_pass, gfx->body_pipeline);
-    SDL_GPUBuffer *buffers[] = { sim->positions.buffer, gfx->colors.buffer, sim->masses.buffer, sim->movable.buffer, };
+    SDL_GPUBuffer *buffers[] = { sim->positions.buffer, gfx->colors.buffer, sim->masses.buffer, sim->movable.buffer, cam->matrices };
     SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DrawGPUPrimitives(
         render_pass,
@@ -286,10 +194,10 @@ static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim,
     );
 }
 
-static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_GPURenderPass *render_pass) {
+static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, const Camera *cam, SDL_GPURenderPass *render_pass) {
     if (!trails->body_count) return;
     SDL_BindGPUGraphicsPipeline(render_pass, gfx->trail_pipeline);
-    SDL_GPUBuffer *buffers[] = { trails->array.buffer, gfx->colors.buffer };
+    SDL_GPUBuffer *buffers[] = { trails->array.buffer, gfx->colors.buffer, cam->matrices };
     SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DrawGPUPrimitives(
         render_pass,
@@ -298,10 +206,10 @@ static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_
     );
 }
 
-static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, SDL_GPURenderPass *render_pass) {
+static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, const Camera *cam, SDL_GPURenderPass *render_pass) {
     if (!trajectories->enabled) return;
     SDL_BindGPUGraphicsPipeline(render_pass, gfx->trajectory_pipeline);
-    SDL_GPUBuffer *buffers[] = { trajectories->positions.buffer, gfx->colors.buffer };
+    SDL_GPUBuffer *buffers[] = { trajectories->positions.buffer, gfx->colors.buffer, cam->matrices };
     SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DrawGPUPrimitives(
         render_pass,
@@ -334,33 +242,7 @@ static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *
 //         0, 0
 //     );
 // }
-//
-// static void graphics_predictions_draw(const Graphics *gfx, SDL_GPURenderPass *render_pass, const bool prediction_enabled, const bool ghost_enabled) {
-//     if (!prediction_enabled) return;
-//
-//     if (arrlenu(gfx->colors)) {
-//         SDL_GPUBuffer *buffers[] = { gfx->gpu_predictions.buffer, gfx->gpu_colors.buffer };
-//         SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
-//         SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_prediction_pipeline);
-//         SDL_DrawGPUPrimitives(
-//             render_pass,
-//             PREDICTIONS_LENGTH, arrlenu(gfx->colors),
-//             0, 0
-//         );
-//     }
-//
-//     if (ghost_enabled) {
-//         SDL_GPUBuffer *ghost_buffers[] = { gfx->gpu_predictions.buffer, gfx->gpu_ghost_predictions };
-//         SDL_BindGPUVertexStorageBuffers(render_pass, 0, ghost_buffers, sizeof(ghost_buffers) / sizeof(SDL_GPUBuffer *));
-//         SDL_BindGPUGraphicsPipeline(render_pass, gfx->gpu_ghost_prediction_pipeline);
-//         SDL_DrawGPUPrimitives(
-//             render_pass,
-//             PREDICTIONS_LENGTH, 1,
-//             0, 0
-//         );
-//     }
-// }
-//
+
 static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain) {
     ImDrawData *draw_data = ImGui_GetDrawData();
     cImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);

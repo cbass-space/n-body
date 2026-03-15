@@ -48,6 +48,7 @@ static inline void PrintSPIRVShader(const char *shader_path) {
     SDL_ShaderCross_ShaderStage stage;
     if (SDL_strstr(shader_path, ".vert")) stage = SDL_SHADERCROSS_SHADERSTAGE_VERTEX;
     else if (SDL_strstr(shader_path, ".frag")) stage = SDL_SHADERCROSS_SHADERSTAGE_FRAGMENT;
+    else if (SDL_strstr(shader_path, ".comp")) stage = SDL_SHADERCROSS_SHADERSTAGE_COMPUTE;
     else {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "SDL_strstr() in PrintSPIRVShader(): Shader at path %s must include `.vert` or `.frag` to determine shader type.\n", shader_path);
         return;
@@ -268,7 +269,7 @@ static inline void AppendGPUArrays(SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pas
 // TODO: get better error handling in here
 #define panic(message) do { \
     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s:%d: %s\n", __FILE__, __LINE__, message); \
-    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, SDL_GetError()); \
+    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "%s", SDL_GetError()); \
     SDL_ClearError(); \
     return SDL_APP_FAILURE; \
 } while (0) \

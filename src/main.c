@@ -1,8 +1,9 @@
+#include "SDL3/SDL_video.h"
 #include "constants.h"
 #include "simulation.h"
 #include "trails.h"
 #include "trajectory.h"
-// #include "camera.h"
+#include "camera.h"
 // #include "ghost.h"
 #include "graphics.h"
 #include "gui.h"
@@ -24,7 +25,7 @@ typedef struct {
     Simulation sim;
     Trails trails;
     Trajectories trajectories;
-    // Camera cam;
+    Camera cam;
     // Ghost ghost;
     Graphics gfx;
     Gui gui;
@@ -58,10 +59,10 @@ SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     if (simulation_init(&app->sim, app->gpu) != 0) panic("Failed to initialize simulation!");
     if (trails_init(&app->trails, app->gpu) != 0) panic("Failed to initialize trail module!");
     if (trajectories_init(&app->trajectories, app->gpu) != 0) panic("Failed to initialize trajectory module!");
+    if (camera_init(&app->cam, app->window, app->gpu) != 0) panic("Failed to initialize the camera!");
     if (graphics_init(&app->gfx, app->gpu, app->window) != 0) panic("Failed to initialize graphics!");
     if (gui_init(&app->gui, app->window, app->gpu) != 0) panic("Failed to initialize GUI!");
 
-    // camera_init(&app->cam);
     // ghost_init(&app->ghost);
 
 
@@ -124,10 +125,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     while (accumulator >= app->options.fixed_delta_time) {
         simulation_update(&app->sim, command_buffer, compute_pass, app->options.fixed_delta_time);
         trails_update(&app->trails, command_buffer, compute_pass, &app->sim);
-
-        // FIXME: why does changing this to use &info break everything?
-        trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
-
+        trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time); // FIXME: why does changing this to use &info break everything?
         // camera_update(&app->cam, &app->sim);
         accumulator -= app->options.fixed_delta_time;
     }
@@ -151,8 +149,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .command_buffer = command_buffer,
         .sim = &app->sim,
         .trails = &app->trails,
-        .trajectories = &app->trajectories
-        // .cam = &app->cam,
+        .trajectories = &app->trajectories,
+        .cam = &app->cam,
         // .ghost = &app->ghost,
     });
 
@@ -162,7 +160,9 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 }
 
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
-    // Application *app = appstate;
+    Application *app = appstate;
+    UNUSED(app);
+
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
     gui_event(event);
 
@@ -211,8 +211,9 @@ void SDL_AppQuit(void *appstate, const SDL_AppResult result) {
     simulation_free(&app->sim, app->gpu);
     trails_free(&app->trails, app->gpu);
     trajectories_free(&app->trajectories, app->gpu);
+    camera_free(&app->cam, app->gpu);
     graphics_free(&app->gfx, app->gpu);
-    // gui_free();
+    gui_free();
 
     SDL_DestroyWindow(app->window);
     SDL_DestroyGPUDevice(app->gpu);

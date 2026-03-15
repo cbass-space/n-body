@@ -5,13 +5,12 @@ layout (location = 0) out vec4 out_color;
 const uint TRAIL_LENGTH = 512;
 layout (std430, set = 0, binding = 0) readonly buffer Positions { vec2 positions[][TRAIL_LENGTH]; };
 layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
-
-layout (std140, set = 1, binding = 0) uniform TransformUniform {
+layout (std430, set = 0, binding = 2) readonly buffer Camera {
     mat4 orthographic;
     mat4 view;
 };
 
-layout (std140, set = 1, binding = 1) uniform ConstantsUniform {
+layout (std140, set = 1, binding = 0) uniform ConstantsUniform {
     vec3 _padding;
     uint frame;
     float brightness;

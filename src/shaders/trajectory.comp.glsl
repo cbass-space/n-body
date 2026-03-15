@@ -57,12 +57,14 @@ void main() {
                 v[i] += gravity(i, r[i][frame - 1], frame - 1) * dt;
                 r[i][frame] = r[i][frame - 1] + v[i] * dt;
                 break;
+
             case VERLET:
                 vec2 a = gravity(i, r[i][frame - 1], frame - 1);
                 r[i][frame] = r[i][frame - 1] + v[i] * dt + a * (dt * dt) / 2;
                 vec2 a_next = gravity(i, r[i][frame], frame - 1);
                 v[i] += (a + a_next) * (dt / 2);
                 break;
+
             case RK4:
                 State y = State(r[i][frame - 1], v[i]);
                 State k_1 = f(y, i);
