@@ -18,7 +18,7 @@ An interactive N-Body simulator for exploring Newtonian gravity! Can be used for
 1. [Git](https://git-scm.com/) - Version and package control
 2. [CMake](https://cmake.org/) - Cross platform build system
 3. [Python 3](https://www.python.org/) - For generating ImGui bindings and compiling shaders
-4. [glslc](https://github.com/google/shaderc/#downloads) - For compiling GLSL shaders to SPIR-V for cross-platform shader support with SDL_shadercross
+4. [glslang](https://github.com/KhronosGroup/glslang/releases) - For compiling GLSL shaders to SPIR-V
 
 ### Steps
 

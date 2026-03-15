@@ -1,5 +1,4 @@
 #version 460
-#include "lib/conditionals.lib.glsl"
 
 const uint PREDICTION_LENGTH = 2048;
 layout (std430, set = 0, binding = 0) buffer TrajectoryPositions { vec2 r[][PREDICTION_LENGTH]; };
@@ -23,6 +22,8 @@ layout (std140, set = 2, binding = 0) uniform Constants {
 
 layout (std140, set = 2, binding = 1) uniform Frame { uint frame; };
 
+uint when_eq(uint a, uint b) { return uint (a == b); }
+uint when_neq(uint a, uint b) { return uint (a != b); }
 vec2 gravity(uint self, vec2 r_self, uint frame) {
     vec2 net_a = vec2(0.0);
     for (uint i = 0; i < count; i++) {

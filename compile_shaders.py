@@ -12,9 +12,9 @@ def main():
         print("provide input and output directory!")
         sys.exit(1)
 
-    if shutil.which("glslc") is None:
-        print("Error! glslc was not found in your PATH! Make sure it's installed and available in the PATH.")
-        print("You can download glslc here:  https://github.com/google/shaderc/#downloads")
+    if shutil.which("glslang") is None:
+        print("Error! glslang was not found in your PATH! Make sure it's installed and available in the PATH.")
+        print("You can download glslang here:  https://github.com/KhronosGroup/glslang/releases")
         sys.exit(1)
 
     in_dir = Path(sys.argv[1])
@@ -31,22 +31,13 @@ def main():
         output_file = (out_dir / relative_path).with_suffix(".spv")
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        if ".vert" in input_file.stem:
-            shader_type = "vertex"
-        elif ".frag" in input_file.stem:
-            shader_type = "fragment"
-        elif ".comp" in input_file.stem:
-            shader_type = "compute"
-        elif ".lib" in input_file.stem:
-            continue
-        else:
-            print(f"Skipping {input_file} (unknown type)")
+        if ".lib" in input_file.stem:
             continue
 
         try:
             subprocess.run([
-                "glslc",
-                f"-fshader-stage={shader_type}",
+                "glslang",
+                "-V",
                 str(input_file),
                 "-o",
                 str(output_file),

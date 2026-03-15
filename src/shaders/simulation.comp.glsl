@@ -1,5 +1,4 @@
 #version 460
-#include "lib/conditionals.lib.glsl"
 
 layout (std430, set = 0, binding = 0) buffer Positions { vec2 r[]; };
 layout (std430, set = 0, binding = 1) buffer Velocities { vec2 v[]; };
@@ -18,6 +17,8 @@ layout (std140, set = 2, binding = 0) uniform Constants {
     float dt;
 };
 
+uint when_eq(uint a, uint b) { return uint (a == b); }
+uint when_neq(uint a, uint b) { return uint (a != b); }
 vec2 gravity(uint self, vec2 r_self) {
     vec2 net_a = vec2(0.0);
     for (uint i = 0; i < count; i++) {
