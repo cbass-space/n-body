@@ -3,9 +3,8 @@
 #include "sdl_utils.h"
 
 #include "stb_ds.h"
-#include "SDL3/SDL.h"
 
-i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
+SDL_AppResult simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
     sim->options = (SimulationOptions) {
         .gravity = GRAVITY_DEFAULT,
         .softening = SOFTENING_DEFAULT,

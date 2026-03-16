@@ -4,7 +4,6 @@
 #include "trails.h"
 #include "trajectory.h"
 #include "camera.h"
-// #include "ghost.h"
 #include "graphics.h"
 #include "gui.h"
 
@@ -22,11 +21,11 @@ typedef struct {
     ApplicationOptions options;
     SDL_Window *window;
     SDL_GPUDevice *gpu;
+
     Simulation sim;
     Trails trails;
     Trajectories trajectories;
     Camera cam;
-    // Ghost ghost;
     Graphics gfx;
     Gui gui;
 } Application;
@@ -59,12 +58,9 @@ SDL_AppResult SDL_AppInit(void **appstate, const int argc, char **argv) {
     if (simulation_init(&app->sim, app->gpu) != 0) panic("Failed to initialize simulation!");
     if (trails_init(&app->trails, app->gpu) != 0) panic("Failed to initialize trail module!");
     if (trajectories_init(&app->trajectories, app->gpu) != 0) panic("Failed to initialize trajectory module!");
-    if (camera_init(&app->cam, app->window, app->gpu) != 0) panic("Failed to initialize the camera!");
+    camera_init(&app->cam);
     if (graphics_init(&app->gfx, app->gpu, app->window) != 0) panic("Failed to initialize graphics!");
     if (gui_init(&app->gui, app->window, app->gpu) != 0) panic("Failed to initialize GUI!");
-
-    // ghost_init(&app->ghost);
-
 
     SDL_GPUCommandBuffer *command_buffer = SDL_AcquireGPUCommandBuffer(app->gpu);
     SDL_GPUCopyPass *copy_pass = SDL_BeginGPUCopyPass(command_buffer);
@@ -126,32 +122,26 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         simulation_update(&app->sim, command_buffer, compute_pass, app->options.fixed_delta_time);
         trails_update(&app->trails, command_buffer, compute_pass, &app->sim);
         trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time); // FIXME: why does changing this to use &info break everything?
-        // camera_update(&app->cam, &app->sim);
+        camera_update(&app->cam, app->window, app->gpu, &app->sim);
         accumulator -= app->options.fixed_delta_time;
     }
 
     SDL_EndGPUComputePass(compute_pass);
 
-    // ghost_update(&app->ghost, app->window, &app->sim, &app->cam);
-
     gui_update(&(GuiUpdateInfo) {
         .app = &app->options,
         .sim = &app->sim,
         .trajectories = &app->trajectories,
-        // .cam = &app->cam,
-        // .ghost = &app->ghost,
         .gfx = &app->gfx,
     });
 
-    graphics_draw(&app->gfx, &(GraphicsDrawInfo) {
+    graphics_draw(&app->gfx, command_buffer, &(GraphicsDrawInfo) {
         .window = app->window,
         .gpu = app->gpu,
-        .command_buffer = command_buffer,
         .sim = &app->sim,
         .trails = &app->trails,
         .trajectories = &app->trajectories,
         .cam = &app->cam,
-        // .ghost = &app->ghost,
     });
 
     SDL_SubmitGPUCommandBuffer(command_buffer);
@@ -164,33 +154,10 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
     UNUSED(app);
 
     if (event->type == SDL_EVENT_QUIT) return SDL_APP_SUCCESS;
+
     gui_event(event);
-
-    // if (!app->gui.io->WantCaptureMouse) {
-    //     camera_mouse(&app->cam, event, app->window, app->ghost.enabled);
-    //     if (ghost_mouse(&app->ghost, event)) {
-    //         const usize index = simulation_add_body(&app->sim, &(SimulationAddBodyInfo) {
-    //             .position = app->ghost.position,
-    //             .velocity = app->ghost.velocity,
-    //             .mass = app->ghost.mass,
-    //             .movable = app->ghost.movable
-    //         });
-    //
-    //         graphics_add_body(&app->gfx, &(GraphicsAddBodyInfo) {
-    //             .gpu = app->gpu,
-    //             .color = app->ghost.color,
-    //             .sim = &app->sim,
-    //             .index = index
-    //         });
-    //     }
-    // }
-
-    // if (!app->gui.io->WantCaptureKeyboard) {
-    //     camera_keyboard(&app->cam, event, &app->sim);
-    //     ghost_keyboard(&app->ghost, event);
-    //     if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_SPACE) app->sim.options.paused = !app->sim.options.paused;
-    // }
-
+    if (!app->gui.io->WantCaptureMouse) camera_mouse(&app->cam, event);
+    if (!app->gui.io->WantCaptureKeyboard) camera_keyboard(&app->cam, event, &app->sim);
     return SDL_APP_CONTINUE;
 }
 
@@ -211,7 +178,6 @@ void SDL_AppQuit(void *appstate, const SDL_AppResult result) {
     simulation_free(&app->sim, app->gpu);
     trails_free(&app->trails, app->gpu);
     trajectories_free(&app->trajectories, app->gpu);
-    camera_free(&app->cam, app->gpu);
     graphics_free(&app->gfx, app->gpu);
     gui_free();
 
@@ -219,3 +185,4 @@ void SDL_AppQuit(void *appstate, const SDL_AppResult result) {
     SDL_DestroyGPUDevice(app->gpu);
     SDL_Quit();
 }
+

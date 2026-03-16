@@ -14,7 +14,7 @@ typedef struct Trajectories {
     bool enabled;
 } Trajectories;
 
-i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu);
+SDL_AppResult trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu);
 u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_pass, HMM_Vec2 position);
 typedef struct {
     SDL_GPUCommandBuffer *command_buffer;

@@ -6,7 +6,7 @@
 
 #define PREDICTION_SIZE sizeof(HMM_Vec2) * PREDICTION_LENGTH
 
-i32 trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
+SDL_AppResult trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
     trajectories->pipeline = CreateGPUComputePipeline(gpu, "shaders/trajectory.comp.spv");
     if (!trajectories->pipeline) panic("Failed to create trajectories pipeline!");
 

@@ -165,7 +165,7 @@ typedef struct {
     u32 destination_offset;
     u32 buffer_offset;
 } ReadGPUBufferBinding;
-static inline void ReadFromGPUBuffer(SDL_GPUDevice *gpu, const ReadGPUBufferBinding *bindings, const usize bindings_count) {
+static inline void ReadFromGPUBufferNow(SDL_GPUDevice *gpu, const ReadGPUBufferBinding *bindings, const usize bindings_count) {
     if (bindings_count == 0) return;
     u32 total_size = 0;
     for (usize i = 0; i < bindings_count; i++) total_size += bindings[i].size;

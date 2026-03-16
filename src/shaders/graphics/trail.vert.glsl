@@ -5,24 +5,25 @@ layout (location = 0) out vec4 out_color;
 const uint TRAIL_LENGTH = 512;
 layout (std430, set = 0, binding = 0) readonly buffer Positions { vec2 positions[][TRAIL_LENGTH]; };
 layout (std430, set = 0, binding = 1) readonly buffer Colors { vec4 colors[]; };
-layout (std430, set = 0, binding = 2) readonly buffer Camera {
+
+layout (std140, set = 1, binding = 0) uniform Camera {
     mat4 orthographic;
     mat4 view;
 };
 
-layout (std140, set = 1, binding = 0) uniform ConstantsUniform {
+layout (std140, set = 1, binding = 1) uniform Constants {
     vec3 _padding;
-    uint frame;
+    uint target;
     float brightness;
-//    uint target;
+    uint frame;
 };
 
 void main() {
     vec2 position = positions[gl_InstanceIndex][(frame - gl_VertexIndex) % TRAIL_LENGTH];
-//    if (target != uint(-1)) {
-//        position += positions[target][frame]
-//            - positions[target][(frame - gl_VertexIndex) % TRAIL_LENGTH];
-//    }
+    if (target != uint(-1)) {
+        position += positions[target][frame]
+            - positions[target][(frame - gl_VertexIndex) % TRAIL_LENGTH];
+    }
 
     gl_Position = orthographic * view * vec4(position, 0.0, 1.0);
 

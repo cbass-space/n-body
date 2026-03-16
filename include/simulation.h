@@ -16,7 +16,6 @@ typedef struct {
     f32 gravity;
     f32 softening;
     f32 density;
-    // bool collide;
     bool paused;
 } SimulationOptions;
 
@@ -31,7 +30,7 @@ typedef struct Simulation {
     u32 body_count;
 } Simulation;
 
-i32 simulation_init(Simulation *sim, SDL_GPUDevice *gpu);
+SDL_AppResult simulation_init(Simulation *sim, SDL_GPUDevice *gpu);
 typedef struct {
     HMM_Vec2 position;
     HMM_Vec2 velocity;

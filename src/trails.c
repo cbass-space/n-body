@@ -4,11 +4,12 @@
 
 #define TRAIL_SIZE sizeof(HMM_Vec2) * TRAIL_LENGTH
 
-i32 trails_init(Trails *trails, SDL_GPUDevice *gpu) {
-    trails->array = CreateGPUArray(gpu, TRAIL_SIZE, SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
-    if (!trails->array.buffer) panic("Could not create trails array!");
+SDL_AppResult trails_init(Trails *trails, SDL_GPUDevice *gpu) {
     trails->pipeline = CreateGPUComputePipeline(gpu, "shaders/trail.comp.spv");
     if (!trails->pipeline) panic("Could not create trails pipeline!");
+
+    trails->array = CreateGPUArray(gpu, TRAIL_SIZE, SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
+    if (!trails->array.buffer) panic("Could not create trails array!");
     return SDL_APP_CONTINUE;
 }
 
