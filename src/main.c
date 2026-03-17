@@ -103,8 +103,8 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
     }
 
     SDL_EndGPUComputePass(compute_pass);
-    ghost_update(&app->ghost, app->gpu, &app->sim, &app->cam);
     camera_update(&app->cam, app->window, app->gpu, &app->sim);
+    ghost_update(&app->ghost, app->gpu, &app->sim, &app->cam);
 
     gui_update(&(GuiUpdateInfo) {
         .app = &app->options,

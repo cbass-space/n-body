@@ -44,9 +44,6 @@ pip install ply==3.11
     cmake -B build -DCMAKE_BUILD_TYPE=Debug
     cd build && cmake --build .
     ./n-body
-
-    # for IDE support
-    ln -s build/compile_commands.json . 
     ```
 
     **For Release**

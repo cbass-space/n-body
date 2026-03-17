@@ -30,7 +30,7 @@ void ghost_update(Ghost *ghost, SDL_GPUDevice *gpu, const Simulation *sim, const
             {
                 .buffer = sim->velocities.buffer,
                 .buffer_offset = cam->target * sizeof(HMM_Vec2),
-                .destination = (u8*) &target_position,
+                .destination = (u8*) &target_velocity,
                 .size = sizeof(HMM_Vec2)
             },
         };

@@ -172,9 +172,12 @@ static void graphics_ghost_draw(const Graphics *gfx, SDL_GPUCommandBuffer *comma
     SDL_PushGPUVertexUniformData(command_buffer, 2, &ghost_info, sizeof(ghost_info));
     SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
 
-    SDL_BindGPUVertexStorageBuffers(render_pass, 0, &trajectories->ghost, 1);
-    SDL_BindGPUGraphicsPipeline(render_pass, gfx->ghost_trajectory_pipeline);
-    SDL_DrawGPUPrimitives(render_pass, PREDICTION_LENGTH, 1, 0, 0);
+    if (trajectories->enabled) {
+        SDL_GPUBuffer *buffers[] = { trajectories->positions.buffer, trajectories->ghost };
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
+        SDL_BindGPUGraphicsPipeline(render_pass, gfx->ghost_trajectory_pipeline);
+        SDL_DrawGPUPrimitives(render_pass, PREDICTION_LENGTH, 1, 0, 0);
+    }
 }
 
 static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_GPURenderPass *render_pass) {
