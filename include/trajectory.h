@@ -5,11 +5,14 @@
 #include "sdl_utils.h"
 
 typedef struct Simulation Simulation;
+typedef struct Ghost Ghost;
 
 typedef struct Trajectories {
     SDL_GPUComputePipeline *pipeline;
+    SDL_GPUComputePipeline *ghost_pipeline;
     GPUArray positions;
     GPUArray velocities;
+    SDL_GPUBuffer *ghost;
     u32 body_count;
     bool enabled;
 } Trajectories;
@@ -22,7 +25,8 @@ typedef struct {
     const Simulation *sim;
     f32 delta_time;
 } TrajectoryUpdateInfo;
-void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim, f32 delta_time);
+void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim, const Ghost *ghost, f32 delta_time);
 void trajectories_free(const Trajectories *trajectories, SDL_GPUDevice *gpu);
 
 #endif
+

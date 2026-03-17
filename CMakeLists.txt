@@ -19,7 +19,7 @@ add_executable(${PROJECT_NAME} WIN32
     src/trails.c
     src/trajectory.c
     src/camera.c
-#    src/ghost.c
+    src/ghost.c
     src/graphics.c
     src/gui.c
 
@@ -28,7 +28,7 @@ add_executable(${PROJECT_NAME} WIN32
     include/trails.h
     include/trajectory.h
     include/camera.h
-#    include/ghost.h
+    include/ghost.h
     include/graphics.h
     include/gui.h
 )

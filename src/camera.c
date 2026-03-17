@@ -1,5 +1,6 @@
 #include "camera.h"
 #include "simulation.h"
+#include "ghost.h"
 
 #include "sdl_utils.h"
 
@@ -36,7 +37,7 @@ void camera_update(Camera *cam, SDL_Window *window, SDL_GPUDevice *gpu, const Si
 }
 
 HMM_Vec2 mouse_world_position(const Camera *cam);
-void camera_mouse(Camera *cam, const SDL_Event *event) {
+void camera_mouse(Camera *cam, const SDL_Event *event, const Ghost *ghost) {
     HMM_Vec2 mouse_delta = { 0 };
     if (SDL_GetRelativeMouseState(&mouse_delta.X, &mouse_delta.Y) & SDL_BUTTON_RMASK) {
         cam->target = (u32) -1;
@@ -45,7 +46,7 @@ void camera_mouse(Camera *cam, const SDL_Event *event) {
         cam->position = HMM_AddV2(cam->position, mouse_delta);
     }
 
-    if (event->type == SDL_EVENT_MOUSE_WHEEL) {
+    if (event->type == SDL_EVENT_MOUSE_WHEEL && !ghost->enabled) {
         const HMM_Vec2 mouse_old = mouse_world_position(cam);
         cam->zoom *= SDL_expf(event->wheel.y * -0.1f);
 

@@ -3,13 +3,15 @@
 
 typedef struct Simulation Simulation;
 typedef struct Camera Camera;
-// typedef struct Ghost Ghost;
+typedef struct Ghost Ghost;
 typedef struct Trajectories Trajectories;
 typedef struct Graphics Graphics;
 
-#include "SDL3/SDL.h"
-#include "dcimgui.h"
 #include <stdbool.h>
+#include "SDL3/SDL_video.h"
+#include "SDL3/SDL_gpu.h"
+#include "SDL3/SDL_events.h"
+#include "dcimgui.h"
 #include "types.h"
 
 typedef struct {
@@ -20,13 +22,13 @@ typedef struct {
     ImGuiIO *io;
 } Gui;
 
-i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu);
+void gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu);
 typedef struct {
     ApplicationOptions *app;
     Simulation *sim;
-    Camera *cam;
-    // Ghost *ghost;
+    Ghost *ghost;
     Trajectories *trajectories;
+    Camera *cam;
     Graphics *gfx;
 } GuiUpdateInfo;
 void gui_update(const GuiUpdateInfo *info);

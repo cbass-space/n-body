@@ -10,18 +10,17 @@ const uint VERLET = 1;
 const uint RK4 = 2;
 
 layout (std140, set = 2, binding = 0) uniform Constants {
-    uint count;
+    uint body_count;
     uint integrator;
     float G;
     float ee;
     float dt;
 };
 
-uint when_eq(uint a, uint b) { return uint (a == b); }
-uint when_neq(uint a, uint b) { return uint (a != b); }
+uint when_neq(uint a, uint b) { return uint(a != b); }
 vec2 gravity(uint self, vec2 r_self) {
     vec2 net_a = vec2(0.0);
-    for (uint i = 0; i < count; i++) {
+    for (uint i = 0; i < body_count; i++) {
         vec2 R = r[i] - r_self;
         float R2 = dot(R, R) + ee * ee;
         net_a += (G * m[i] / R2) * normalize(R) * when_neq(i, self);

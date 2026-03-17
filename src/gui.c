@@ -1,17 +1,15 @@
 #include "gui.h"
 #include "simulation.h"
 #include "camera.h"
-// #include "ghost.h"
+#include "ghost.h"
 #include "trajectory.h"
 #include "graphics.h"
 
 #include "stb_ds.h"
-#include "dcimgui.h"
 #include "backends/dcimgui_impl_sdl3.h"
 #include "backends/dcimgui_impl_sdlgpu3.h"
-#include "types.h"
 
-i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
+void gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
     CIMGUI_CHECKVERSION();
     ImGui_CreateContext(NULL);
     gui->io = ImGui_GetIO();
@@ -34,12 +32,10 @@ i32 gui_init(Gui *gui, SDL_Window *window, SDL_GPUDevice *gpu) {
         .SwapchainComposition = SDL_GPU_SWAPCHAINCOMPOSITION_SDR,
         .PresentMode = SDL_GPU_PRESENTMODE_VSYNC
     });
-
-    return 0;
 }
 
 static void HelpMarker(const char *desc);
-// static void gui_create_body(Ghost *ghost);
+static void gui_create_body(Ghost *ghost);
 // static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam);
 static void gui_controls(ApplicationOptions *app, SimulationOptions *sim, Trajectories *trajectories, GraphicsOptions *gfx);
 void gui_update(const GuiUpdateInfo *info) {
@@ -48,7 +44,7 @@ void gui_update(const GuiUpdateInfo *info) {
     ImGui_NewFrame();
     ImGui_Begin("N-Body Simulator", NULL, ImGuiWindowFlags_AlwaysAutoResize);
 
-    // gui_create_body(info->ghost);
+    gui_create_body(info->ghost);
     // gui_inspector(info->sim, info->gfx, info->cam);
     gui_controls(info->app, &info->sim->options, info->trajectories, &info->gfx->options);
 
@@ -56,20 +52,20 @@ void gui_update(const GuiUpdateInfo *info) {
     ImGui_Render();
 }
 
-// static void gui_create_body(Ghost *ghost) {
-//     if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
-//         ImGui_Checkbox("Body creation mode!", &ghost->enabled);
-//         HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
-//         ImGui_BeginDisabled(!ghost->enabled);
-//         ImGui_DragFloat("Mass", &ghost->mass);
-//         HelpMarker("The mass of the new body.");
-//         ImGui_ColorEdit3("Color", (f32 *) &ghost->color, 0);
-//         HelpMarker("The color of the new body.");
-//         ImGui_Checkbox("Movable", &ghost->movable);
-//         HelpMarker("Whether the body should be simulated or remain in place.");
-//         ImGui_EndDisabled();
-//     }
-// }
+static void gui_create_body(Ghost *ghost) {
+    if (ImGui_CollapsingHeader("Create Body", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui_Checkbox("Body creation mode!", &ghost->enabled);
+        HelpMarker("To create a new body: activate body creation mode, hold right click where you want to create the new body, drag out its velocity, and release!");
+        ImGui_BeginDisabled(!ghost->enabled);
+        ImGui_DragFloat("Mass", &ghost->mass);
+        HelpMarker("The mass of the new body.");
+        ImGui_ColorEdit3("Color", (f32 *) &ghost->color, 0);
+        HelpMarker("The color of the new body.");
+        ImGui_Checkbox("Movable", &ghost->movable);
+        HelpMarker("Whether the body should be simulated or remain in place.");
+        ImGui_EndDisabled();
+    }
+}
 
 // static void gui_inspector(const Simulation *sim, Graphics *gfx, Camera *cam) {
 //     if (ImGui_CollapsingHeader("Simulation Inspector", 0)) {

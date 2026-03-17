@@ -1,7 +1,11 @@
 #ifndef N_BODY_GHOST
 #define N_BODY_GHOST
 
-#include "SDL3/SDL.h"
+#include <stdbool.h>
+
+#include "SDL3/SDL_gpu.h"
+#include "SDL3/SDL_events.h"
+#include "SDL3/SDL_pixels.h"
 #include "HandmadeMath.h"
 #include "types.h"
 
@@ -19,8 +23,9 @@ typedef struct Ghost {
 } Ghost;
 
 void ghost_init(Ghost *ghost);
-void ghost_update(Ghost *ghost, SDL_Window *window, const Simulation *sim, const Camera *cam);
+void ghost_update(Ghost *ghost, SDL_GPUDevice *gpu, const Simulation *sim, const Camera *cam);
 bool ghost_mouse(Ghost *ghost, const SDL_Event *event);
 void ghost_keyboard(Ghost *ghost, const SDL_Event *event);
 
 #endif
+

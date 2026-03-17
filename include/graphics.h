@@ -6,6 +6,7 @@
 #include "sdl_utils.h"
 
 typedef struct Simulation Simulation;
+typedef struct Ghost Ghost;
 typedef struct Trails Trails;
 typedef struct Trajectories Trajectories;
 typedef struct Camera Camera;
@@ -20,10 +21,11 @@ typedef struct {
 typedef struct Graphics {
     GraphicsOptions options;
     u32 body_count;
-
     SDL_GPUGraphicsPipeline *body_pipeline;
     SDL_GPUGraphicsPipeline *trail_pipeline;
     SDL_GPUGraphicsPipeline *trajectory_pipeline;
+    SDL_GPUGraphicsPipeline *ghost_body_pipeline;
+    SDL_GPUGraphicsPipeline *ghost_trajectory_pipeline;
     GPUArray colors;
 } Graphics;
 
@@ -37,12 +39,15 @@ u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_p
 typedef struct {
     SDL_Window *window;
     SDL_GPUDevice *gpu;
+    SDL_GPUCommandBuffer *command_buffer;
     const Simulation *sim;
+    const Ghost *ghost;
     const Trails *trails;
     const Trajectories *trajectories;
     const Camera *cam;
 } GraphicsDrawInfo;
-void graphics_draw(const Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const GraphicsDrawInfo *info);
+void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info);
 void graphics_free(const Graphics *gfx, SDL_GPUDevice *gpu);
 
 #endif
+
