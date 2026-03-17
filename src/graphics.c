@@ -4,7 +4,7 @@
 #include "simulation.h"
 #include "ghost.h"
 #include "trails.h"
-#include "trajectory.h"
+#include "trajectories.h"
 #include "camera.h"
 
 #include "SDL3/SDL_gpu.h"

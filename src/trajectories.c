@@ -1,4 +1,4 @@
-#include "trajectory.h"
+#include "trajectories.h"
 #include "SDL3/SDL_gpu.h"
 #include "constants.h"
 #include "simulation.h"
@@ -10,7 +10,7 @@
 
 SDL_AppResult trajectories_init(Trajectories *trajectories, SDL_GPUDevice *gpu) {
     trajectories->pipeline = CreateGPUComputePipeline(gpu, "shaders/trajectory.comp.spv");
-    trajectories->ghost_pipeline = CreateGPUComputePipeline(gpu, "shaders/ghost.comp.spv");
+    trajectories->ghost_pipeline = CreateGPUComputePipeline(gpu, "shaders/ghost_trajectory.comp.spv");
     if (!trajectories->pipeline) panic("Failed to create trajectories pipeline!");
     if (!trajectories->ghost_pipeline) panic("Failed to create ghost trajectories pipeline!");
 
@@ -86,7 +86,6 @@ void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer 
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
 
     for (u32 i = 0; i < PREDICTION_LENGTH; i++) {
-        // FIXME: ghost and simulation aren't simultaneous, causing bodies to think ghost is stationary
         SDL_PushGPUComputeUniformData(command_buffer, 2, &i, sizeof(i));
         SDL_BindGPUComputePipeline(compute_pass, trajectories->pipeline);
         SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);

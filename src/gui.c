@@ -2,7 +2,7 @@
 #include "simulation.h"
 #include "camera.h"
 #include "ghost.h"
-#include "trajectory.h"
+#include "trajectories.h"
 #include "graphics.h"
 
 #include "stb_ds.h"

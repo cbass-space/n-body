@@ -30,11 +30,10 @@ layout (std140, set = 2, binding = 1) uniform Ghost {
 
 layout (std140, set = 2, binding = 2) uniform Frame { uint frame; };
 
-uint when_neq(uint a, uint b) { return uint(a != b); }
 vec2 gravity(vec2 r_self, uint frame) {
     vec2 net_a = vec2(0.0);
     for (uint i = 0; i < body_count; i++) {
-        vec2 R = r_g[frame] - r_self;
+        vec2 R = r[i][frame] - r_self;
         float R2 = dot(R, R) + ee * ee;
         net_a += (G * m[i] / R2) * normalize(R);
     }

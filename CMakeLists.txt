@@ -17,7 +17,7 @@ add_executable(${PROJECT_NAME} WIN32
     src/main.c
     src/simulation.c
     src/trails.c
-    src/trajectory.c
+    src/trajectories.c
     src/camera.c
     src/ghost.c
     src/graphics.c
@@ -26,7 +26,7 @@ add_executable(${PROJECT_NAME} WIN32
     include/constants.h
     include/simulation.h
     include/trails.h
-    include/trajectory.h
+    include/trajectories.h
     include/camera.h
     include/ghost.h
     include/graphics.h
