@@ -92,12 +92,17 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         bindings, sizeof(bindings) / sizeof(SDL_GPUStorageBufferReadWriteBinding)
     );
 
-
     accumulator += delta_time;
     while (accumulator >= app->options.fixed_delta_time) {
         simulation_update(&app->sim, command_buffer, compute_pass, app->options.fixed_delta_time);
         trails_update(&app->trails, command_buffer, compute_pass, &app->sim);
-        trajectories_update(&app->trajectories, command_buffer, compute_pass, &app->sim, &app->ghost, PREDICTION_DELTA_TIME_MULTIPLIER * app->options.fixed_delta_time);
+        trajectories_update(&app->trajectories, &(TrajectoriesUpdateInfo) {
+            .command_buffer = command_buffer,
+            .compute_pass = compute_pass,
+            .sim = &app->sim,
+            .ghost = &app->ghost,
+            .delta_time = delta_time
+        });
         // FIXME: why does changing this to use &info break everything?
         accumulator -= app->options.fixed_delta_time;
     }
@@ -125,7 +130,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
         .trajectories = &app->trajectories,
         .cam = &app->cam,
     });
-
+    
     SDL_SubmitGPUCommandBuffer(command_buffer);
 
     return SDL_APP_CONTINUE;

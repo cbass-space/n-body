@@ -42,7 +42,7 @@ u32 trajectories_add_body(Trajectories *trajectories, SDL_GPUDevice *gpu, SDL_GP
     return trajectories->body_count++;
 }
 
-void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim, const Ghost *ghost, f32 delta_time) {
+void trajectories_update(const Trajectories *trajectories, const TrajectoriesUpdateInfo *info) {
     if (!trajectories->enabled) return;
     const struct {
         u32 count;
@@ -51,11 +51,11 @@ void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer 
         f32 softening;
         f32 delta_time;
     } constants = {
-        sim->body_count,
-        sim->options.integrator,
-        sim->options.gravity,
-        sim->options.softening,
-        delta_time,
+        info->sim->body_count,
+        info->sim->options.integrator,
+        info->sim->options.gravity,
+        info->sim->options.softening,
+        info->delta_time,
     };
 
     const struct {
@@ -64,33 +64,33 @@ void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer 
         f32 mass;
         bool enabled;
     } ghost_info = {
-        ghost->position,
-        ghost->velocity,
-        ghost->mass,
-        ghost->enabled
+        info->ghost->position,
+        info->ghost->velocity,
+        info->ghost->mass,
+        info->ghost->enabled
     };
 
-    SDL_PushGPUComputeUniformData(command_buffer, 0, &constants, sizeof(constants));
-    SDL_PushGPUComputeUniformData(command_buffer, 1, &ghost_info, sizeof(ghost_info));
+    SDL_PushGPUComputeUniformData(info->command_buffer, 0, &constants, sizeof(constants));
+    SDL_PushGPUComputeUniformData(info->command_buffer, 1, &ghost_info, sizeof(ghost_info));
 
     SDL_GPUBuffer *buffers[] = {
         trajectories->positions.buffer,
         trajectories->velocities.buffer,
         trajectories->ghost,
-        sim->positions.buffer,
-        sim->velocities.buffer,
-        sim->masses.buffer,
-        sim->movable.buffer
+        info->sim->positions.buffer,
+        info->sim->velocities.buffer,
+        info->sim->masses.buffer,
+        info->sim->movable.buffer
     };
 
-    SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
+    SDL_BindGPUComputeStorageBuffers(info->compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
 
     for (u32 i = 0; i < PREDICTION_LENGTH; i++) {
-        SDL_PushGPUComputeUniformData(command_buffer, 2, &i, sizeof(i));
-        SDL_BindGPUComputePipeline(compute_pass, trajectories->pipeline);
-        SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
-        SDL_BindGPUComputePipeline(compute_pass, trajectories->ghost_pipeline);
-        SDL_DispatchGPUCompute(compute_pass, 1, 1, 1);
+        SDL_PushGPUComputeUniformData(info->command_buffer, 2, &i, sizeof(i));
+        SDL_BindGPUComputePipeline(info->compute_pass, trajectories->pipeline);
+        SDL_DispatchGPUCompute(info->compute_pass, info->sim->body_count, 1, 1);
+        SDL_BindGPUComputePipeline(info->compute_pass, trajectories->ghost_pipeline);
+        SDL_DispatchGPUCompute(info->compute_pass, 1, 1, 1);
     }
 }
 

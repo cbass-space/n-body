@@ -80,10 +80,22 @@ u32 graphics_add_body(Graphics *gfx, SDL_GPUDevice *gpu, SDL_GPUCopyPass *copy_p
 }
 
 static void graphics_uniform_camera(SDL_GPUCommandBuffer *command_buffer, const Camera *cam, const u32 slot);
-static void graphics_uniform_constants(SDL_GPUCommandBuffer *command_buffer, const Graphics *gfx, const SimulationOptions *sim, const Trails *trails, const Camera *cam, const u32 slot);
+typedef struct {
+    SDL_GPUCommandBuffer *command_buffer;
+    const SimulationOptions *sim;
+    const Trails *trails;
+    const Camera *cam;
+    const u32 slot;
+} GraphicsUniformConsantsInfo;
+static void graphics_uniform_constants(const Graphics *gfx, const GraphicsUniformConsantsInfo *info);
 
 static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, SDL_GPURenderPass *render_pass);
-static void graphics_ghost_draw(const Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const Ghost *ghost, const Trajectories *trajectories, SDL_GPURenderPass *render_pass);
+typedef struct {
+    SDL_GPUCommandBuffer *command_buffer;
+    SDL_GPURenderPass *render_pass;
+    const Trajectories *trajectories;
+} GraphicsGhostDrawInfo;
+static void graphics_ghost_draw(const Graphics *gfx, const Ghost *ghost, const GraphicsGhostDrawInfo *info);
 static void graphics_trails_draw(const Graphics *gfx, const Trails *trails, SDL_GPURenderPass *render_pass);
 static void graphics_trajectories_draw(const Graphics *gfx, const Trajectories *trajectories, SDL_GPURenderPass *render_pass);
 static void graphics_gui_draw(SDL_GPUCommandBuffer *command_buffer, SDL_GPUTexture *swapchain);
@@ -97,7 +109,13 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     }
 
     graphics_uniform_camera(info->command_buffer, info->cam, 0);
-    graphics_uniform_constants(info->command_buffer, gfx, &info->sim->options, info->trails, info->cam, 1);
+    graphics_uniform_constants(gfx, &(GraphicsUniformConsantsInfo) {
+        .command_buffer = info->command_buffer,
+        .sim = &info->sim->options,
+        .trails = info->trails,
+        .cam = info->cam,
+        .slot = 1
+    });
 
     SDL_GPURenderPass *render_pass = SDL_BeginGPURenderPass(info->command_buffer, &(SDL_GPUColorTargetInfo) {
         .clear_color = gfx->options.clear_color,
@@ -107,7 +125,11 @@ void graphics_draw(const Graphics *gfx, const GraphicsDrawInfo *info) {
     }, 1, NULL);
 
     graphics_simulation_draw(gfx, info->sim, render_pass);
-    graphics_ghost_draw(gfx, info->command_buffer, info->ghost, info->trajectories, render_pass);
+    graphics_ghost_draw(gfx, info->ghost, &(GraphicsGhostDrawInfo) {
+        .command_buffer = info->command_buffer,
+        .render_pass = render_pass,
+        .trajectories = info->trajectories
+    });
     graphics_trails_draw(gfx, info->trails, render_pass);
     graphics_trajectories_draw(gfx, info->trajectories, render_pass);
     SDL_EndGPURenderPass(render_pass);
@@ -120,7 +142,7 @@ static void graphics_uniform_camera(SDL_GPUCommandBuffer *command_buffer, const 
     SDL_PushGPUVertexUniformData(command_buffer, slot, &matrices, sizeof(matrices));
 }
 
-static void graphics_uniform_constants(SDL_GPUCommandBuffer *command_buffer, const Graphics *gfx, const SimulationOptions *sim, const Trails *trails, const Camera *cam, const u32 slot) {
+static void graphics_uniform_constants(const Graphics *gfx, const GraphicsUniformConsantsInfo *info) {
     const struct {
         f32 density;
         f32 movable_outline;
@@ -129,15 +151,15 @@ static void graphics_uniform_constants(SDL_GPUCommandBuffer *command_buffer, con
         f32 trail_brightness;
         u32 trail_frame;
     } constants = {
-        sim->density,
+        info->sim->density,
         gfx->options.movable_outline,
         gfx->options.static_outline,
-        cam->target,
+        info->cam->target,
         gfx->options.trail_brightness,
-        trails->frame,
+        info->trails->frame,
     };
 
-    SDL_PushGPUVertexUniformData(command_buffer, slot, &constants, sizeof(constants));
+    SDL_PushGPUVertexUniformData(info->command_buffer, info->slot, &constants, sizeof(constants));
 }
 
 static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim, SDL_GPURenderPass *render_pass) {
@@ -152,9 +174,9 @@ static void graphics_simulation_draw(const Graphics *gfx, const Simulation *sim,
     );
 }
 
-static void graphics_ghost_draw(const Graphics *gfx, SDL_GPUCommandBuffer *command_buffer, const Ghost *ghost, const Trajectories *trajectories, SDL_GPURenderPass *render_pass) {
+static void graphics_ghost_draw(const Graphics *gfx, const Ghost *ghost, const GraphicsGhostDrawInfo *info) {
     if (!ghost->enabled) return;
-    SDL_BindGPUGraphicsPipeline(render_pass, gfx->ghost_body_pipeline);
+    SDL_BindGPUGraphicsPipeline(info->render_pass, gfx->ghost_body_pipeline);
 
     // TODO: can we create a "body" inside Ghost to avoid copy?
     struct {
@@ -169,14 +191,14 @@ static void graphics_ghost_draw(const Graphics *gfx, SDL_GPUCommandBuffer *comma
         ghost->movable
     };
 
-    SDL_PushGPUVertexUniformData(command_buffer, 2, &ghost_info, sizeof(ghost_info));
-    SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
+    SDL_PushGPUVertexUniformData(info->command_buffer, 2, &ghost_info, sizeof(ghost_info));
+    SDL_DrawGPUPrimitives(info->render_pass, 4, 1, 0, 0);
 
-    if (trajectories->enabled) {
-        SDL_GPUBuffer *buffers[] = { trajectories->positions.buffer, trajectories->ghost };
-        SDL_BindGPUVertexStorageBuffers(render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
-        SDL_BindGPUGraphicsPipeline(render_pass, gfx->ghost_trajectory_pipeline);
-        SDL_DrawGPUPrimitives(render_pass, PREDICTION_LENGTH, 1, 0, 0);
+    if (info->trajectories->enabled) {
+        SDL_GPUBuffer *buffers[] = { info->trajectories->positions.buffer, info->trajectories->ghost };
+        SDL_BindGPUVertexStorageBuffers(info->render_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
+        SDL_BindGPUGraphicsPipeline(info->render_pass, gfx->ghost_trajectory_pipeline);
+        SDL_DrawGPUPrimitives(info->render_pass, PREDICTION_LENGTH, 1, 0, 0);
     }
 }
 

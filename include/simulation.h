@@ -11,7 +11,7 @@ typedef struct {
     enum {
         INTEGRATOR_EULER,
         INTEGRATOR_VERLET,
-        INTEGRATOR_RK4,
+        INTEGRATOR_RUNGE_KUTTA_4,
     } integrator;
     f32 gravity;
     f32 softening;
@@ -21,7 +21,7 @@ typedef struct {
 
 typedef struct Simulation {
     SimulationOptions options;
-    SDL_GPUComputePipeline *pipeline;
+    SDL_GPUComputePipeline *integrators[3];
 
     GPUArray positions;
     GPUArray velocities;

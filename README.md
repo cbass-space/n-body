@@ -24,18 +24,19 @@ An interactive N-Body simulator for exploring Newtonian gravity! Can be used for
 
 1. Clone repository
 
-```bash
-git clone <URL_TO_REPO> <PROJECT_PATH>
-cd <PROJECT_PATH>
-```
+    ```bash
+    git clone https://github.com/cbass-space/n-body.git
+    cd n-body
+    ```
 
 2. Setup up Python build environment
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install ply==3.11
-```
+    ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate  # macos
+    .venv\Scripts\Activate.psl # windows
+    pip install ply==3.11
+    ```
 
 3. Generate CMake profile, build & run
 
@@ -61,3 +62,4 @@ pip install ply==3.11
 4. Test mass/satellite exploration
    - find a way of visualizing Hohmann Transfers, Interplanetary Transport Networks (and manifolds?)
 5. Save/load system
+

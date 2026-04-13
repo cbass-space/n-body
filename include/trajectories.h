@@ -23,9 +23,10 @@ typedef struct {
     SDL_GPUCommandBuffer *command_buffer;
     SDL_GPUComputePass *compute_pass;
     const Simulation *sim;
+    const Ghost *ghost;
     f32 delta_time;
-} TrajectoryUpdateInfo;
-void trajectories_update(const Trajectories *trajectories, SDL_GPUCommandBuffer *command_buffer, SDL_GPUComputePass *compute_pass, const Simulation *sim, const Ghost *ghost, f32 delta_time);
+} TrajectoriesUpdateInfo;
+void trajectories_update(const Trajectories *trajectories, const TrajectoriesUpdateInfo *info);
 void trajectories_free(const Trajectories *trajectories, SDL_GPUDevice *gpu);
 
 #endif

@@ -13,8 +13,13 @@ SDL_AppResult simulation_init(Simulation *sim, SDL_GPUDevice *gpu) {
         .paused = false
     };
 
-    sim->pipeline = CreateGPUComputePipeline(gpu, "shaders/simulation.comp.spv");
-    if (!sim->pipeline) panic("Failed to create simulation compute pipeline!");
+    SDL_GPUComputePipeline *euler = CreateGPUComputePipeline(gpu, "shaders/simulation/euler.comp.spv");
+    SDL_GPUComputePipeline *verlet = CreateGPUComputePipeline(gpu, "shaders/simulation/verlet.comp.spv");
+    SDL_GPUComputePipeline *runge_kutta = CreateGPUComputePipeline(gpu, "shaders/simulation/runge_kutta.comp.spv");
+    if (!euler) panic("Failed to create simulation euler compute pipeline!");
+    if (!verlet) panic("Failed to create simulation verlet compute pipeline!");
+    if (!runge_kutta) panic("Failed to create simulation runge kutta compute pipeline!");
+    memcpy(sim->integrators, (SDL_GPUComputePipeline*[3]) { euler, verlet, runge_kutta }, sizeof(sim->integrators));
 
     sim->positions = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
     sim->velocities = CreateGPUArray(gpu, sizeof(HMM_Vec2), SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_READ | SDL_GPU_BUFFERUSAGE_COMPUTE_STORAGE_WRITE | SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ);
@@ -45,13 +50,11 @@ void simulation_update(const Simulation *sim, SDL_GPUCommandBuffer *command_buff
 
     const struct {
         u32 body_count;
-        u32 integrator;
         f32 gravity;
         f32 softening;
         f32 delta_time;
     } constants = {
         sim->body_count,
-        sim->options.integrator,
         sim->options.gravity,
         sim->options.softening,
         delta_time
@@ -59,14 +62,16 @@ void simulation_update(const Simulation *sim, SDL_GPUCommandBuffer *command_buff
 
     SDL_PushGPUComputeUniformData(command_buffer, 0, &constants, sizeof(constants));
 
-    SDL_BindGPUComputePipeline(compute_pass, sim->pipeline);
+    SDL_GPUComputePipeline *integrator = sim->integrators[sim->options.integrator];
+    SDL_BindGPUComputePipeline(compute_pass, integrator);
+
     SDL_GPUBuffer *buffers[] = { sim->positions.buffer, sim->velocities.buffer, sim->masses.buffer, sim->movable.buffer, };
     SDL_BindGPUComputeStorageBuffers(compute_pass, 0, buffers, sizeof(buffers) / sizeof(SDL_GPUBuffer *));
     SDL_DispatchGPUCompute(compute_pass, sim->body_count, 1, 1);
 }
 
 void simulation_free(const Simulation *sim, SDL_GPUDevice *gpu) {
-    SDL_ReleaseGPUComputePipeline(gpu, sim->pipeline);
+    for (u8 i = 0; i < 3; i++) SDL_ReleaseGPUComputePipeline(gpu, sim->integrators[i]);
     SDL_ReleaseGPUBuffer(gpu, sim->positions.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->velocities.buffer);
     SDL_ReleaseGPUBuffer(gpu, sim->masses.buffer);
